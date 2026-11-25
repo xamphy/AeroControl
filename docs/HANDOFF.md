@@ -1,4 +1,4 @@
-﻿# Aero Control — handoff (2026-11-25, 23:00)
+# Aero Control — handoff (2026-11-25, 23:00)
 
 Replacement UI for GIGABYTE Control Center (GCC) on the user's **AERO 14 OLED BMF** (i7-13620H, RTX 4050,
 2880×1800 90/60 Hz OLED, white backlit keyboard). macOS-styled WPF app, .NET Framework 4.8, runs elevated.
@@ -25,6 +25,21 @@ or `AeroControl.exe --startup on|off`). GCC's `GCC` logon task stays DISABLED (u
 - Airplane key: left to Windows (radio HID collection, no interceptable key; disabling the device node is risky).
 - Fn+F12: GCC toggled AI Boost (per-app automatic profiles). User: skip for now. Idea if revisited: "Auto" mode.
 
+## 2026-11-26 02:40 — design review pass (user approved list)
+
+Content capped at 720 px; thin overlay scrollbar (Theme.xaml ScrollViewer/ScrollBar); sidebar dot → logo "A" path;
+"Options ›" links in accent (LinkButton now draws its own TextBlock: the implicit TextBlock style was overriding the colour);
+"In this mode" heading; temperature bars amber/red (CPU 85/95 °C, GPU 78/85 °C); Battery page: maximum capacity bar
+(design vs full-charge from root\wmi BatteryStaticData/BatteryFullChargedCapacity, readable unelevated: 63.0 of 63.0 Wh),
+wear, charge/discharge watts; pixel-shift copy says icons only; keyboard page draws the real 14" layout (`Views/KeyboardPreview.cs`).
+
+**Custom fan curve now actually used** (before, no mode turned it on, so drags did nothing): per-mode switch
+`Settings.CustomCurve[4]`, `Controller.FanFor(mode)`; one shared curve; floor 20% (fan-off zone deliberately not offered,
+untested); live "Now xx °C" dot. Verified with `--curvetest` (elevated): flat 60% → duty 60/60%, ~5,270 rpm;
+flat 30% → duty 30/30%, ~2,800 rpm; then the mode's own fans restored. PASS.
+`--shot` now runs beside a running instance (no mutex, no keyboard HID, no Fn keys); run unelevated with
+`__COMPAT_LAYER=RunAsInvoker` to skip UAC (sensors then show "–"). Also renders `main-perf-curve.png`.
+
 ## What works (verified on hardware, GCC closed)
 
 | Area | Notes |
@@ -37,7 +52,6 @@ or `AeroControl.exe --startup on|off`). GCC's `GCC` logon task stays DISABLED (u
 | Fn keys (commit c52af7c) | Fn+Esc `0x84` cycles Silent→Balanced→Performance (Turbo is app-only, per user); Fn+F3/F4 `0x7D/0x7E` brightness ±10 with HUD; Fn+F10 `0x81` touchpad HUD (state from `HKCU\...\PrecisionTouchPad\Status\Enabled`); Fn+Space `04-01-lvl` levels 0/24/32/50 → off/48/64/100% HUD. Mic/Fn-lock/Win-lock mapped from GCC code but not present on this keyboard |
 | Icon | user's `Desktop\appicon.png` logo rebuilt as vector, plain white (`tools/make-icon.ps1`) |
 
-Not yet tested: fan-curve editor write.
 Fn+F12 (`0x88`): GCC used it for AI Boost on/off; user said skip for now. Options offered: cycle
 Windows power mode / same as Fn+Esc / nothing.
 Removed by user request: battery cycle count (firmware `getBattCyc1`=92 is unverified; Windows reports 0) — don't re-add.

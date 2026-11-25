@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.IO;
 using System.Linq;
 using System.Threading;
@@ -12,6 +12,7 @@ namespace AeroControl;
 
 public partial class App : Application
 {
+    public static bool ShotMode { get; private set; }
     private Mutex _single;
     private EventWaitHandle _showSignal;
     private Controller _controller;
@@ -49,11 +50,14 @@ public partial class App : Application
         }
         if (args.Contains("--kbtest")) { Shutdown(KbTest()); return; }
         if (args.Contains("--kbsweep")) { Shutdown(KbSweep(8000)); return; }
+        if (args.Contains("--curvetest")) { Shutdown(CurveTest()); return; }
 
         // ---- single instance: a second launch just shows the running one ----
-        _single = new Mutex(true, "AeroControl.Single", out bool first);
-        _showSignal = new EventWaitHandle(false, EventResetMode.AutoReset, "AeroControl.Show");
-        if (!first) { _showSignal.Set(); Shutdown(0); return; }
+        // (--shot renders alongside a running instance and never touches the keyboard or Fn keys)
+        ShotMode = args.Contains("--shot");
+        _single = new Mutex(!ShotMode, "AeroControl.Single", out bool first);
+        _showSignal = new EventWaitHandle(false, EventResetMode.AutoReset, ShotMode ? null : "AeroControl.Show");
+        if (!first && !ShotMode) { _showSignal.Set(); Shutdown(0); return; }
 
         bool firstRun = !File.Exists(Path.Combine(Log.Dir, "settings.json"));
         _controller = new Controller();
@@ -64,7 +68,7 @@ public partial class App : Application
         _main = new MainWindow(_vm);
         _popover = new PopoverWindow(_vm, page => _main.ShowAndActivate(page));
         _tray = new TrayIcon(() => _popover.Toggle(), () => _main.ShowAndActivate(), Quit);
-        try { _fnKeys = new FnKeys(_controller, Dispatcher, () => _vm.RefreshFromHardware()); }
+        if (!ShotMode) try { _fnKeys = new FnKeys(_controller, Dispatcher, () => _vm.RefreshFromHardware()); }
         catch (Exception ex) { Log.Write("FnKeys init failed: " + ex); }
 
         var t = new Thread(() => { while (_showSignal.WaitOne()) Dispatcher.BeginInvoke(new Action(() => _main.ShowAndActivate())); })
@@ -136,6 +140,14 @@ public partial class App : Application
             await System.Threading.Tasks.Task.Delay(400);
             Save(_main, Path.Combine(dir, $"main-{page}.png"));
         }
+        // fan curve editor, shown in memory only (nothing saved or sent to the fans)
+        var st = _controller.Settings;
+        var saved = st.CustomCurve;
+        st.CustomCurve = new[] { true, true, true, true };
+        _vm.Page = "perf";
+        await System.Threading.Tasks.Task.Delay(400);
+        Save(_main, Path.Combine(dir, "main-perf-curve.png"));
+        st.CustomCurve = saved;
         _popover.Toggle();
         await System.Threading.Tasks.Task.Delay(600);
         Save(_popover, Path.Combine(dir, "popover.png"));
@@ -174,6 +186,48 @@ public partial class App : Application
     }
 
     // ---------------- diagnostics kept from bring-up ----------------
+
+    /// <summary>
+    /// Custom fan curve on real hardware: flat 60% curve, then flat 30%, logging the EC's fan duty and RPM each second,
+    /// then the current mode's own fan profile and the saved curve are put back. Log in aerocontrol.log.
+    /// </summary>
+    private static int CurveTest()
+    {
+        var st = Core.Settings.Load();
+        var mode = Modes.ById(Hardware.Sensors.OnAc ? st.ModeAc : st.ModeDc);
+        var saved = st.CurveTemps.Zip(st.CurvePercents, (t, p) => (t, p)).ToList();
+        Log.Write($"CURVETEST start: mode {mode.Id}, fans={Hardware.Fans.ReadMode()}");
+        int fails = 0;
+        try
+        {
+            foreach (int pct in new[] { 60, 30 })
+            {
+                var flat = saved.Select(x => (x.t, pct)).ToList();
+                Hardware.Fans.Apply(Hardware.FanMode.Custom, 50, flat);
+                var table = Hardware.Fans.ReadCurve();
+                bool tableOk = table.All(x => Math.Abs(x.percent - pct) <= 1);
+                Log.Write($"CURVETEST {pct}%: mode={Hardware.Fans.ReadMode()} table ok={tableOk} [{string.Join(" ", table.Select(x => $"{x.temp}:{x.percent}"))}]");
+                int lastDuty = -1;
+                for (int i = 0; i < 15; i++)
+                {
+                    Thread.Sleep(1000);
+                    var s = Hardware.Sensors.Read();
+                    lastDuty = s.Fan1Pct;
+                    Log.Write($"CURVETEST {pct}% t+{i + 1}s: cpu {s.CpuTemp} gpu {s.GpuTemp} duty {s.Fan1Pct}/{s.Fan2Pct}% rpm {s.Fan1Rpm}/{s.Fan2Rpm}");
+                }
+                bool follows = Math.Abs(lastDuty - pct) <= 5;
+                Log.Write($"CURVETEST {pct}% result: table={tableOk} duty follows curve={follows}");
+                if (!tableOk || !follows) fails++;
+            }
+        }
+        finally
+        {
+            Hardware.Fans.WriteCurve(saved);
+            Hardware.Fans.Apply(st.UsesCurve(mode.Index) ? Hardware.FanMode.Custom : mode.Fan, st.FixedFanPercent, saved);
+            Log.Write($"CURVETEST restored: fans={Hardware.Fans.ReadMode()} ({(fails == 0 ? "PASS" : "FAIL")})");
+        }
+        return fails;
+    }
 
     private static int KbTest()
     {

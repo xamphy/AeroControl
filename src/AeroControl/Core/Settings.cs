@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.IO;
 using System.Runtime.Serialization;
 using System.Runtime.Serialization.Json;
@@ -17,6 +17,10 @@ public sealed class Settings
     [DataMember] public int FixedFanPercent = 50;
     [DataMember] public int[] CurveTemps = { 0, 50, 53, 56, 59, 62, 65, 68, 71, 74, 77, 80, 83, 86, 89 };
     [DataMember] public int[] CurvePercents = { 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80, 85, 90, 100 };
+    /// <summary>Per mode (silent, balanced, performance, turbo): use the custom curve instead of the mode's fan profile.</summary>
+    [DataMember] public bool[] CustomCurve = new bool[4];
+
+    public bool UsesCurve(int modeIndex) => CustomCurve != null && modeIndex < CustomCurve.Length && CustomCurve[modeIndex];
 
     // Display
     [DataMember] public bool AutoRefresh = true;

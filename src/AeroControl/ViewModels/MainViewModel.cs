@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
@@ -82,7 +82,8 @@ public sealed class MainViewModel : Observable
         Raise(nameof(CpuTemp)); Raise(nameof(GpuTemp)); Raise(nameof(Fan1)); Raise(nameof(Fan2));
         Raise(nameof(Fan1Duty)); Raise(nameof(Fan2Duty)); Raise(nameof(CpuPct)); Raise(nameof(GpuPct));
         Raise(nameof(Fan1Pct)); Raise(nameof(Fan2Pct)); Raise(nameof(BatteryText)); Raise(nameof(PowerSource));
-        Raise(nameof(BatteryPercentText));
+        Raise(nameof(BatteryPercentText)); Raise(nameof(CpuHeat)); Raise(nameof(GpuHeat)); Raise(nameof(CpuTempValue));
+        Raise(nameof(BatteryRateText));
     }
 
     /// <summary>Re-read values that can change outside the app (Fn keys): brightness, keyboard level.</summary>
@@ -126,6 +127,10 @@ public sealed class MainViewModel : Observable
     public string Fan2Duty => L.Fan2Pct >= 0 ? $"{L.Fan2Pct}% duty" : "";
     public double CpuPct => Math.Max(0, L.CpuTemp) / 100.0;
     public double GpuPct => Math.Max(0, L.GpuTemp) / 100.0;
+    /// <summary>"" normal, "warm", "hot" — colours the temperature bars (CPU throttles at 100 °C, the RTX 4050 Laptop near 87 °C).</summary>
+    public string CpuHeat => L.CpuTemp >= 95 ? "hot" : L.CpuTemp >= 85 ? "warm" : "";
+    public string GpuHeat => L.GpuTemp >= 85 ? "hot" : L.GpuTemp >= 78 ? "warm" : "";
+    public double CpuTempValue => L.CpuTemp;
     public double Fan1Pct => Math.Max(0, L.Fan1Pct) / 100.0;
     public double Fan2Pct => Math.Max(0, L.Fan2Pct) / 100.0;
     public string PowerSource => Controller.OnAc ? "plugged in" : "on battery";
@@ -142,11 +147,12 @@ public sealed class MainViewModel : Observable
     // ---------- mode ----------
     public Mode Current => Controller.CurrentMode;
     public string ModeName => Current.Name;
-    public string ModeDetail => $"{Modes.FanLabel(Current.Fan)} fans · {(Controller.OnAc ? Current.CpuSummaryAc : Current.CpuSummaryDc)}";
+    private string FanName => Controller.FanFor(Current) == FanMode.Custom ? "Custom curve" : Modes.FanLabel(Current.Fan);
+    public string ModeDetail => $"{(Controller.FanFor(Current) == FanMode.Custom ? "Custom fan curve" : Modes.FanLabel(Current.Fan) + " fans")} · {(Controller.OnAc ? Current.CpuSummaryAc : Current.CpuSummaryDc)}";
     public string ModeCaption => $"Current mode · {PowerSource}";
     public IEnumerable<InfoRow> ModeRows => new[]
     {
-        new InfoRow { Label = "Fans", Value = Modes.FanLabel(Current.Fan) },
+        new InfoRow { Label = "Fans", Value = FanName },
         new InfoRow { Label = "CPU power limit", Value = Controller.OnAc ? Current.CpuSummaryAc : Current.CpuSummaryDc },
         new InfoRow { Label = "Windows power mode", Value = Modes.OverlayLabel(Current.Overlay) },
         new InfoRow { Label = "Keyboard backlight", Value = Controller.Settings.KbFollowMode ? $"{Controller.Settings.KbPerMode[Current.Index]}%" : "Unchanged" },
@@ -160,8 +166,21 @@ public sealed class MainViewModel : Observable
     public string ChargeName => Controller.Settings.Charge switch { ChargeLimit.Full => "Full capacity", ChargeLimit.Balanced => "Balanced", _ => "Max battery health" };
     public void CycleCharge() => Controller.SetCharge((ChargeLimit)(((int)Controller.Settings.Charge + 1) % 3));
     public string BatteryPercentText => L.BatteryPercent >= 0 ? $"{L.BatteryPercent}%" : "–";
-    public string FanText => Modes.FanLabel(Current.Fan);
+    public string FanText => FanName;
     public string Health => Controller.BatteryHealthy switch { true => "Normal", false => "Service recommended", _ => "–" };
+    private static string Wh(int mwh) => (mwh / 1000.0).ToString("0.0") + " Wh";
+    public bool HasCapacity => Controller.BatteryDesignMwh > 0 && Controller.BatteryFullMwh > 0;
+    public string CapacityText => HasCapacity ? $"{Wh(Controller.BatteryFullMwh)} of {Wh(Controller.BatteryDesignMwh)}" : "–";
+    public double CapacityPct => HasCapacity ? Math.Min(1.0, (double)Controller.BatteryFullMwh / Controller.BatteryDesignMwh) : 0;
+    public string CapacityPctText => HasCapacity ? $"{Math.Min(100, Math.Round(100.0 * Controller.BatteryFullMwh / Controller.BatteryDesignMwh)):0}%" : "–";
+    public string WearText => HasCapacity ? $"{Math.Max(0, Math.Round(100 - 100.0 * Controller.BatteryFullMwh / Controller.BatteryDesignMwh)):0}%" : "–";
+    public string BatteryRateText => Controller.BatteryRateMw switch
+    {
+        null => "–",
+        0 => "Idle",
+        > 0 and var r => $"Charging · {r / 1000.0:0.0} W",
+        var r => $"Using {-r / 1000.0:0.0} W",
+    };
 
     // ---------- display ----------
     private int _brightness;
@@ -194,6 +213,8 @@ public sealed class MainViewModel : Observable
     public bool KbFollow { get => Controller.Settings.KbFollowMode; set { Controller.Settings.KbFollowMode = value; Controller.Settings.Save(); Raise(); } }
 
     // ---------- fan curve ----------
+    public bool CustomCurve { get => Controller.Settings.UsesCurve(Current.Index); set => Controller.SetCustomCurve(value); }
+    public string CustomCurveHint => $"Replaces {Current.Name}'s fan profile with the curve below. Other modes keep their own.";
     public void CommitCurve() => Controller.SetFanCurve(Curve.Select(p => p.Temp).ToArray(), Curve.Select(p => p.Percent).ToArray());
 
     // ---------- app settings ----------

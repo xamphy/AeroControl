@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Concurrent;
 using System.Linq;
 using System.Threading;
@@ -20,6 +20,9 @@ public sealed class Controller : IDisposable
     public SensorSnapshot Live { get; private set; } = new();
     public bool OnAc { get; private set; } = Sensors.OnAc;
     public bool? BatteryHealthy { get; private set; }
+    public int BatteryDesignMwh { get; private set; } = -1;
+    public int BatteryFullMwh { get; private set; } = -1;
+    public int? BatteryRateMw { get; private set; }
     public int KeyboardLevel { get; private set; } = -1;
 
     public event Action LiveUpdated;
@@ -44,7 +47,9 @@ public sealed class Controller : IDisposable
         Enqueue(() =>
         {
             BatteryHealthy = Battery.HealthNormal;
-            try { _kb = KeyboardLight.Open(); KeyboardLevel = _kb?.GetBrightness() ?? -1; } catch { }
+            (BatteryDesignMwh, BatteryFullMwh) = Battery.Capacity();
+            Log.Write($"Battery capacity: design {BatteryDesignMwh} mWh, full {BatteryFullMwh} mWh");
+            if (!App.ShotMode) try { _kb = KeyboardLight.Open(); KeyboardLevel = _kb?.GetBrightness() ?? -1; } catch { }
             if (Battery.ReadLimit() is ChargeLimit l) Settings.Charge = l;
             StateChanged?.Invoke();
         });
@@ -52,6 +57,28 @@ public sealed class Controller : IDisposable
     }
 
     public Mode CurrentMode => Modes.ById(OnAc ? Settings.ModeAc : Settings.ModeDc);
+
+    /// <summary>The fan setting a mode really uses: its own profile, or the custom curve if switched on for it.</summary>
+    public FanMode FanFor(Mode m) => Settings.UsesCurve(m.Index) ? FanMode.Custom : m.Fan;
+
+    private System.Collections.Generic.List<(int, int)> CurveList => Settings.CurveTemps.Zip(Settings.CurvePercents, (t, p) => (t, p)).ToList();
+
+    public void SetCustomCurve(bool on)
+    {
+        var m = CurrentMode;
+        if (Settings.CustomCurve == null || Settings.CustomCurve.Length < 4) Settings.CustomCurve = new bool[4];
+        Settings.CustomCurve[m.Index] = on;
+        Settings.Save();
+        StateChanged?.Invoke();
+        var fan = FanFor(m);
+        Enqueue(() => { Fans.Apply(fan, Settings.FixedFanPercent, CurveList); LogFans(); StateChanged?.Invoke(); });
+    }
+
+    private void LogFans()
+    {
+        var c = Fans.ReadMode() == FanMode.Custom ? " table=" + string.Join(" ", Fans.ReadCurve().Select(p => $"{p.temp}:{p.percent}")) : "";
+        Log.Write($"  readback: fans={Fans.ReadMode()?.ToString() ?? "?"}{c}");
+    }
 
     // ---------- actions (called from UI thread) ----------
 
@@ -123,8 +150,8 @@ public sealed class Controller : IDisposable
     public void SetFanCurve(int[] temps, int[] percents)
     {
         Settings.CurveTemps = temps; Settings.CurvePercents = percents; Settings.Save();
-        var curve = temps.Zip(percents, (t, p) => (t, p)).ToList();
-        Enqueue(() => Fans.WriteCurve(curve));
+        var curve = CurveList;
+        Enqueue(() => { Fans.WriteCurve(curve); Log.Write("Fan curve written"); LogFans(); });
     }
 
     // ---------- worker side ----------
@@ -132,7 +159,7 @@ public sealed class Controller : IDisposable
     private void ApplyMode(Mode m, bool onAc)
     {
         Log.Write($"ApplyMode {m.Id} ({(onAc ? "AC" : "DC")})");
-        Fans.Apply(m.Fan, Settings.FixedFanPercent);
+        Fans.Apply(FanFor(m), Settings.FixedFanPercent, CurveList);
         if (CpuPower.Available) CpuPower.ApplyStage(onAc ? m.CpuStageAc : m.CpuStageDc);
         WindowsPowerMode.Set(m.Overlay);
         GccSync.WriteMode(m, onAc);
@@ -179,6 +206,7 @@ public sealed class Controller : IDisposable
     private void Poll()
     {
         Live = Sensors.Read();
+        BatteryRateMw = Battery.RateMilliwatts();
         LiveUpdated?.Invoke();
     }
 

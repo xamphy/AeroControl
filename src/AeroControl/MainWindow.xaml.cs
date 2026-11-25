@@ -17,7 +17,6 @@ public partial class MainWindow : Window
     {
         InitializeComponent();
         DataContext = vm;
-        KeyGrid.ItemsSource = Enumerable.Range(0, 56).ToArray();
         CurveEditor.Committed += () => Vm.CommitCurve();
         SourceInitialized += (_, _) => Win11Frame(new WindowInteropHelper(this).Handle);
     }

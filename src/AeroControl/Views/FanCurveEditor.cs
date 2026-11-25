@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.ObjectModel;
 using System.Globalization;
 using System.Linq;
@@ -12,11 +12,13 @@ namespace AeroControl.Views;
 /// <summary>
 /// Draggable 15-point fan curve (temperature → duty), drawn like the mockup.
 /// Temperatures stay strictly increasing (point 0 is the EC's floor and keeps its temperature);
-/// duty never decreases with temperature. Raises Committed when a drag ends.
+/// duty never decreases with temperature and never goes below MinPercent (fans fully off is untested on this EC).
+/// A live dot marks where the current temperature sits on the curve. Raises Committed when a drag ends.
 /// </summary>
 public sealed class FanCurveEditor : FrameworkElement
 {
     private const double TMin = 40, TMax = 95, PadL = 40, PadB = 22, PadT = 8, PadR = 8;
+    public const int MinPercent = 20;
 
     public static readonly DependencyProperty PointsProperty = DependencyProperty.Register(
         nameof(Points), typeof(ObservableCollection<CurvePoint>), typeof(FanCurveEditor),
@@ -29,6 +31,10 @@ public sealed class FanCurveEditor : FrameworkElement
         nameof(LabelBrush), typeof(Brush), typeof(FanCurveEditor), new FrameworkPropertyMetadata(Brushes.Gray, FrameworkPropertyMetadataOptions.AffectsRender));
     public static readonly DependencyProperty KnobFillProperty = DependencyProperty.Register(
         nameof(KnobFill), typeof(Brush), typeof(FanCurveEditor), new FrameworkPropertyMetadata(Brushes.Black, FrameworkPropertyMetadataOptions.AffectsRender));
+
+    public static readonly DependencyProperty CurrentTempProperty = DependencyProperty.Register(
+        nameof(CurrentTemp), typeof(double), typeof(FanCurveEditor), new FrameworkPropertyMetadata(-1.0, FrameworkPropertyMetadataOptions.AffectsRender));
+    public double CurrentTemp { get => (double)GetValue(CurrentTempProperty); set => SetValue(CurrentTempProperty, value); }
 
     public ObservableCollection<CurvePoint> Points { get => (ObservableCollection<CurvePoint>)GetValue(PointsProperty); set => SetValue(PointsProperty, value); }
     public Brush Accent { get => (Brush)GetValue(AccentProperty); set => SetValue(AccentProperty, value); }
@@ -87,6 +93,29 @@ public sealed class FanCurveEditor : FrameworkElement
         dc.DrawGeometry(soft, null, fill);
         dc.DrawGeometry(null, new Pen(Accent, 2.5) { LineJoin = PenLineJoin.Round }, line);
 
+        if (CurrentTemp > 0)
+        {
+            // duty the curve gives at the current temperature (the EC steps between points; draw on the line)
+            double t = CurrentTemp, pct = Points[0].Percent;
+            for (int i = 1; i < Points.Count; i++)
+            {
+                var a = Points[i - 1]; var b = Points[i];
+                if (t >= b.Temp) { pct = b.Percent; continue; }
+                if (t > a.Temp) pct = a.Percent + (b.Percent - a.Percent) * (t - a.Temp) / Math.Max(1, b.Temp - a.Temp);
+                break;
+            }
+            if (t >= Points[Points.Count - 1].Temp) pct = Math.Max(pct, Points[Points.Count - 1].Percent);
+            var at = new Point(r.Left + (Math.Max(TMin, Math.Min(TMax, t)) - TMin) / (TMax - TMin) * r.Width, r.Bottom - pct / 100.0 * r.Height);
+            var dash = new Pen(LabelBrush, 1) { DashStyle = new DashStyle(new double[] { 3, 3 }, 0) };
+            dc.DrawLine(dash, new Point(at.X, r.Bottom), at);
+            var glow = Accent.Clone(); glow.Opacity = 0.3;
+            dc.DrawEllipse(glow, null, at, 10, 10);
+            dc.DrawEllipse(Brushes.White, new Pen(Accent, 2), at, 5, 5);
+            var lbl = Text($"Now {t:0} °C", dpi, Accent);
+            double lx = Math.Min(r.Right - lbl.Width, Math.Max(r.Left, at.X - lbl.Width / 2));
+            dc.DrawText(lbl, new Point(lx, Math.Min(r.Bottom - lbl.Height - 4, at.Y + 12)));
+        }
+
         for (int i = 0; i < pts.Count; i++)
         {
             double rad = i == _drag || i == _hover ? 7 : 5;
@@ -134,7 +163,7 @@ public sealed class FanCurveEditor : FrameworkElement
         var r = Plot;
         var p = Points[_drag];
         int pct = (int)Math.Round((r.Bottom - m.Y) / r.Height * 100);
-        int lo = _drag > 0 ? Points[_drag - 1].Percent : 0;
+        int lo = Math.Max(MinPercent, _drag > 0 ? Points[_drag - 1].Percent : 0);
         int hi = _drag < Points.Count - 1 ? Points[_drag + 1].Percent : 100;
         p.Percent = Math.Max(lo, Math.Min(hi, Math.Max(0, Math.Min(100, pct))));
         if (_drag > 0)
