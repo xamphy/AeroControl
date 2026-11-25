@@ -22,6 +22,10 @@ public sealed class FnKeys : IDisposable
     private const string IcoLock = "M6 11h12v9H6zM8 11V8a4 4 0 0 1 8 0v3";
     private const string IcoWin = "M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z";
 
+    private const string IcoSpeaker = "M4 9h4l5-4v14l-5-4H4zM16 9a4 4 0 0 1 0 6M18.5 6.5a8 8 0 0 1 0 11";
+    private const string IcoSpeakerOff = "M4 9h4l5-4v14l-5-4H4zM16 9l5 6M21 9l-5 6";
+
+    private readonly MediaKeyHook _volumeKeys;
     private readonly Controller _c;
     private readonly Dispatcher _ui;
     private readonly HotkeyListener _listener;
@@ -33,6 +37,18 @@ public sealed class FnKeys : IDisposable
         _c = c; _ui = ui; _refreshUi = refreshUi;
         _listener = new HotkeyListener();
         _listener.Hotkey += (_, e) => _ui.BeginInvoke(new Action(() => Handle(e)));
+        try { _volumeKeys = new MediaKeyHook(); _volumeKeys.Pressed += vk => _ui.BeginInvoke(new Action(() => Volume(vk))); }
+        catch (Exception ex) { Log.Write("Volume keys hook failed: " + ex.Message); }
+    }
+
+    private void Volume(int vk)
+    {
+        var r = vk == MediaKeyHook.VolumeMute ? Speakers.ToggleMute()
+              : Speakers.Step(vk == MediaKeyHook.VolumeUp ? 0.02f : -0.02f);
+        Log.Write($"Volume key 0x{vk:X2} -> {(r is (int p, bool m) ? $"{p}%{(m ? " muted" : "")}" : "failed")}");
+        if (r is not (int pct, bool muted)) return;
+        if (muted) _osd.ShowState(IcoSpeakerOff, "Volume", "Muted");
+        else _osd.ShowLevel(pct == 0 ? IcoSpeakerOff : IcoSpeaker, "Volume", pct);
     }
 
     private void Handle(HotkeyEventArgs e)
@@ -111,5 +127,5 @@ public sealed class FnKeys : IDisposable
         return k == null || Convert.ToInt32(k.GetValue("Enabled", 1)) != 0;
     }
 
-    public void Dispose() { _listener.Dispose(); _osd.Close(); }
+    public void Dispose() { _volumeKeys?.Dispose(); _listener.Dispose(); _osd.Close(); }
 }

@@ -1,5 +1,6 @@
-using System;
+﻿using System;
 using System.Runtime.InteropServices;
+using static AeroControl.Input.AudioEndpoint;
 
 namespace AeroControl.Input;
 
@@ -34,19 +35,64 @@ public static class Microphone
         }
     }
 
-    private static IAudioEndpointVolume Endpoint()
+    private static IAudioEndpointVolume Endpoint() => AudioEndpoint.Open(1 /* eCapture */);
+}
+
+/// <summary>Default speakers (render endpoint): what the volume keys change.</summary>
+public static class Speakers
+{
+    /// <summary>Change volume by <paramref name="delta"/> (0..1 scale, Windows uses 0.02 per key press);
+    /// raising it unmutes, like Windows. Returns (percent, muted) or null.</summary>
+    public static (int percent, bool muted)? Step(float delta)
+    {
+        var vol = AudioEndpoint.Open(0 /* eRender */);
+        if (vol == null) return null;
+        try
+        {
+            var ctx = Guid.Empty;
+            Marshal.ThrowExceptionForHR(vol.GetMasterVolumeLevelScalar(out float v));
+            v = Math.Max(0f, Math.Min(1f, (float)Math.Round((v + delta) * 50) / 50));
+            Marshal.ThrowExceptionForHR(vol.SetMasterVolumeLevelScalar(v, ref ctx));
+            if (delta > 0) vol.SetMute(false, ref ctx);
+            vol.GetMute(out bool m);
+            return ((int)Math.Round(v * 100), m);
+        }
+        catch (Exception ex) { Log.Write("Speakers: " + ex.Message); return null; }
+        finally { Marshal.ReleaseComObject(vol); }
+    }
+
+    public static (int percent, bool muted)? ToggleMute()
+    {
+        var vol = AudioEndpoint.Open(0);
+        if (vol == null) return null;
+        try
+        {
+            var ctx = Guid.Empty;
+            Marshal.ThrowExceptionForHR(vol.GetMute(out bool m));
+            Marshal.ThrowExceptionForHR(vol.SetMute(!m, ref ctx));
+            vol.GetMasterVolumeLevelScalar(out float v);
+            return ((int)Math.Round(v * 100), !m);
+        }
+        catch (Exception ex) { Log.Write("Speakers: " + ex.Message); return null; }
+        finally { Marshal.ReleaseComObject(vol); }
+    }
+}
+
+internal static class AudioEndpoint
+{
+    public static IAudioEndpointVolume Open(int dataFlow)
     {
         try
         {
             var en = (IMMDeviceEnumerator)new MMDeviceEnumerator();
-            if (en.GetDefaultAudioEndpoint(1 /* eCapture */, 0 /* eConsole */, out var dev) != 0 || dev == null) return null;
+            if (en.GetDefaultAudioEndpoint(dataFlow, 0 /* eConsole */, out var dev) != 0 || dev == null) return null;
             var iid = typeof(IAudioEndpointVolume).GUID;
             Marshal.ThrowExceptionForHR(dev.Activate(ref iid, 23 /* CLSCTX_ALL */, IntPtr.Zero, out object o));
             Marshal.ReleaseComObject(dev);
             Marshal.ReleaseComObject(en);
             return (IAudioEndpointVolume)o;
         }
-        catch (Exception ex) { Log.Write("Microphone: " + ex.Message); return null; }
+        catch (Exception ex) { Log.Write("Audio endpoint: " + ex.Message); return null; }
     }
 
     [ComImport, Guid("BCDE0395-E52F-467C-8E3D-C4579291692E")] private class MMDeviceEnumerator { }
@@ -65,7 +111,7 @@ public static class Microphone
     }
 
     [ComImport, Guid("5CDF2C82-841E-4546-9722-0CF74078229A"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
-    private interface IAudioEndpointVolume
+    internal interface IAudioEndpointVolume
     {
         [PreserveSig] int RegisterControlChangeNotify(IntPtr notify);
         [PreserveSig] int UnregisterControlChangeNotify(IntPtr notify);
