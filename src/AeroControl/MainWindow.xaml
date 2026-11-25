@@ -161,7 +161,7 @@
                                     <StackPanel Orientation="Horizontal" Margin="0,12,0,0">
                                         <StackPanel Margin="0,0,24,0"><TextBlock Text="Charge limit" Style="{StaticResource SubText}" FontSize="11" /><TextBlock Text="{Binding ChargeLimitText}" FontSize="20" FontWeight="SemiBold" /></StackPanel>
                                         <StackPanel Margin="0,0,24,0"><TextBlock Text="Health" Style="{StaticResource SubText}" FontSize="11" /><TextBlock Text="{Binding Health}" FontSize="20" FontWeight="SemiBold" /></StackPanel>
-                                        <StackPanel><TextBlock Text="Cycles" Style="{StaticResource SubText}" FontSize="11" /><TextBlock Text="{Binding Cycles}" FontSize="20" FontWeight="SemiBold" /></StackPanel>
+                                        <StackPanel><TextBlock Text="Charge" Style="{StaticResource SubText}" FontSize="11" /><TextBlock Text="{Binding BatteryPercentText}" FontSize="20" FontWeight="SemiBold" /></StackPanel>
                                     </StackPanel>
                                 </StackPanel>
                             </Border>
@@ -248,7 +248,6 @@
                         <Border Style="{StaticResource CardBox}">
                             <StackPanel>
                                 <Border Style="{StaticResource FirstRow}" MinHeight="44"><DockPanel><TextBlock Text="Condition" VerticalAlignment="Center" /><TextBlock Text="{Binding Health}" Foreground="{DynamicResource Sub}" HorizontalAlignment="Right" VerticalAlignment="Center" /></DockPanel></Border>
-                                <Border Style="{StaticResource Row}" MinHeight="44"><DockPanel><TextBlock Text="Cycle count" VerticalAlignment="Center" /><TextBlock Text="{Binding Cycles}" Foreground="{DynamicResource Sub}" HorizontalAlignment="Right" VerticalAlignment="Center" /></DockPanel></Border>
                                 <Border Style="{StaticResource Row}" MinHeight="44"><DockPanel><TextBlock Text="Status" VerticalAlignment="Center" /><TextBlock Text="{Binding BatteryText}" Foreground="{DynamicResource Sub}" HorizontalAlignment="Right" VerticalAlignment="Center" /></DockPanel></Border>
                             </StackPanel>
                         </Border>

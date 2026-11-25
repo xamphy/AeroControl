@@ -149,7 +149,6 @@ public sealed class MainViewModel : Observable
     public void CycleCharge() => Controller.SetCharge((ChargeLimit)(((int)Controller.Settings.Charge + 1) % 3));
     public string BatteryPercentText => L.BatteryPercent >= 0 ? $"{L.BatteryPercent}%" : "–";
     public string FanText => Modes.FanLabel(Current.Fan);
-    public string Cycles => Controller.BatteryCycles?.ToString() ?? "–";
     public string Health => Controller.BatteryHealthy switch { true => "Normal", false => "Service recommended", _ => "–" };
 
     // ---------- display ----------
@@ -205,7 +204,7 @@ public sealed class MainViewModel : Observable
         new InfoRow { Label = "Processor", Value = "Intel Core i7-13620H" },
         new InfoRow { Label = "Graphics", Value = "NVIDIA GeForce RTX 4050 Laptop" },
         new InfoRow { Label = "Display", Value = "14″ OLED · 2880 × 1800 · 90 Hz" },
-        new InfoRow { Label = "Battery", Value = $"{Health} · {Cycles} cycles" },
+        new InfoRow { Label = "Battery", Value = Health },
         new InfoRow { Label = "Aero Control", Value = "0.1 · alongside GIGABYTE Control Center" },
     };
 }

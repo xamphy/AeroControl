@@ -19,7 +19,6 @@ public sealed class Controller : IDisposable
     public Settings Settings { get; }
     public SensorSnapshot Live { get; private set; } = new();
     public bool OnAc { get; private set; } = Sensors.OnAc;
-    public int? BatteryCycles { get; private set; }
     public bool? BatteryHealthy { get; private set; }
     public int KeyboardLevel { get; private set; } = -1;
 
@@ -44,7 +43,6 @@ public sealed class Controller : IDisposable
 
         Enqueue(() =>
         {
-            BatteryCycles = Battery.Cycles is var c && c >= 0 ? c : (int?)null;
             BatteryHealthy = Battery.HealthNormal;
             try { _kb = KeyboardLight.Open(); KeyboardLevel = _kb?.GetBrightness() ?? -1; } catch { }
             if (Battery.ReadLimit() is ChargeLimit l) Settings.Charge = l;

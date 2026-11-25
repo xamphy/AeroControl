@@ -21,7 +21,5 @@ public static class Battery
         if (GbWmi.TryGet("GetChargePolicy", out var pol) && pol == 0) return ChargeLimit.Full;
         return stop <= 60 ? ChargeLimit.MaxHealth : stop <= 80 ? ChargeLimit.Balanced : ChargeLimit.Full;
     }
-
-    public static int Cycles => GbWmi.TryGet("getBattCyc1", out var c) ? c : -1;
     public static bool? HealthNormal => GbWmi.TryGet("GetBatteryHealth", out var h) ? h == 1 : (bool?)null;
 }
