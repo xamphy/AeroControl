@@ -39,6 +39,14 @@ public partial class App : Application
             Shutdown(Probe.Run(probe + 1 < args.Length ? args[probe + 1] : "probe.txt"));
             return;
         }
+        int su = Array.IndexOf(args, "--startup"); // --startup on|off: register/remove the logon task (installer)
+        if (su >= 0 && su + 1 < args.Length)
+        {
+            bool on = args[su + 1] == "on";
+            var st = Core.Settings.Load(); st.StartWithWindows = on; st.Save();
+            Core.Startup.Set(on);
+            Shutdown(0); return;
+        }
         if (args.Contains("--kbtest")) { Shutdown(KbTest()); return; }
         if (args.Contains("--kbsweep")) { Shutdown(KbSweep(8000)); return; }
 

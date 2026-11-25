@@ -1,5 +1,7 @@
 ﻿# Builds Aero Control (Release) and installs it to Program Files, then restarts it in the tray.
-# Run elevated:  powershell -NoProfile -ExecutionPolicy Bypass -File tools\install.ps1
+# Run elevated:  powershell -NoProfile -ExecutionPolicy Bypass -File tools\install.ps1 [-Startup]
+#   -Startup also registers the 'AeroControl' logon task (same as Settings > Start with Windows)
+param([switch]$Startup)
 $ErrorActionPreference = 'Stop'
 $log = Join-Path $env:TEMP 'AeroControl-install.log'
 function L($m) { $line = "$(Get-Date -f HH:mm:ss) $m"; $line; $line | Out-File $log -Append -Encoding utf8 }
@@ -20,5 +22,6 @@ New-Item -ItemType Directory -Force $dest | Out-Null
 Copy-Item "$src\bin\Release\net48\*" $dest -Recurse -Force
 L "installed to $dest"
 
+if ($Startup) { Start-Process -FilePath "$dest\AeroControl.exe" -ArgumentList '--startup','on' -Wait; L 'logon task registered' }
 Start-Process -FilePath "$dest\AeroControl.exe" -ArgumentList '--tray'
 L 'launched'

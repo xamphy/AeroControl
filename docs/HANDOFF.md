@@ -1,36 +1,20 @@
-# Aero Control — handoff (2026-11-25, 22:30)
+﻿# Aero Control — handoff (2026-11-25, 22:45)
 
 Replacement UI for GIGABYTE Control Center (GCC) on the user's **AERO 14 OLED BMF** (i7-13620H, RTX 4050,
 2880×1800 90/60 Hz OLED, white backlit keyboard). macOS-styled WPF app, .NET Framework 4.8, runs elevated.
 
-## ⚠ Current state — read first
+## Current state
 
-**The internal keyboard is dead until a power cycle.** At 22:25 the app set the keyboard backlight to 100%
-(mode switch Turbo → Silent) and immediately sent a status query (feature report 0x88). The query timed out
-(5 s) and the whole keyboard stopped responding. `pnputil /restart-device USB\VID_0414&PID_7A3A\AP0000000003`
-made it drop off the bus (all `VID_0414&PID_7A3A` nodes "not present"); `pnputil /scan-devices` did not bring
-it back. User was told to: Restart → if still dead, full Shut down 10–15 s → if still dead, unplug charger and
-hold power 30 s (EC reset). Only volatile state was touched (lighting feature reports, same commands GCC
-sends); no firmware/flash writes — expected to recover.
+Keyboard recovered after the reboot (22:35). The incident at 22:25: after slider drags (writes only), a mode
+switch wrote the kb level then immediately queried 0x88. The query hung 5 s and the keyboard dropped off USB.
+**Fixed in ec19a5a** (`Hardware/KeyboardLight.cs`): 65 ms settle after every SetFeature (as GCC does), queries
+refused within 1.5 s of a write, circuit breaker (any failed or >500 ms HID call disables kb HID for the session,
+logged as `KEYBOARD HID DISABLED`). Mode switch no longer reads kb back; Fn+Space uses the level in its report;
+slider writes are logged. Verified: `--kbtest` (incident pattern x6), `--kbsweep` (~100 writes), and the user
+dragging the slider, switching modes and pressing Fn+Space in the app: no trips.
 
-**First thing next session: ask whether the keyboard works after the restart.**
-
-Startup state right now:
-- `AeroControl` logon task: **DELETED** at the user's request (22:33); settings `StartWithWindows=false`. After the fix below is tested, recreate it via the app's Settings → Start with Windows (registers the task from XML).
-- GCC logon task `GCC`: **DISABLED** (by design; GCC stays installed — its `CPUOC.dll`/`YccDrvv3.dll` are used for CPU power limits). Undo: `schtasks /Change /TN GCC /ENABLE`.
-- App is not running (killed during recovery).
-
-## Fix to do before re-enabling startup (keyboard HID safety)
-
-In `src/AeroControl/Hardware/KeyboardLight.cs` + `Core/Controller.cs`:
-1. Sleep **65 ms after every SetFeature**, exactly as GCC's `IteKeyBoard.SetLightEffect_Kb` does.
-2. **No read-back right after a write** (remove `_kb.GetBrightness()` from the readback log line in
-   `Controller.ApplyMode` and from `ReadKeyboard` after Fn+Space — the key report already carries the level).
-3. **Circuit breaker**: if any HID call fails or takes > ~500 ms, stop all keyboard HID traffic for the rest of
-   the session and log it (never retry in a loop).
-4. Serialize keyboard I/O (already on the single `hw` worker — keep it that way; Fn-key path must not call HID
-   from another thread).
-Test with the user watching: mode switches with kb-follow on, Fn+Space spam, then re-enable the logon task.
+Startup: release installed and `AeroControl` logon task re-registered at 22:44 (`tools/install.ps1 -Startup`,
+or `AeroControl.exe --startup on|off`). GCC's `GCC` logon task stays DISABLED (undo: `schtasks /Change /TN GCC /ENABLE`).
 
 ## What works (verified on hardware, GCC closed)
 
