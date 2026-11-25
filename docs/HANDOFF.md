@@ -16,7 +16,7 @@ sends); no firmware/flash writes — expected to recover.
 **First thing next session: ask whether the keyboard works after the restart.**
 
 Startup state right now:
-- `AeroControl` logon task: **DISABLED** (so it can't re-hang the keyboard at sign-in). Re-enable only after the fix below is tested: `schtasks /Change /TN AeroControl /ENABLE`.
+- `AeroControl` logon task: **DELETED** at the user's request (22:33); settings `StartWithWindows=false`. After the fix below is tested, recreate it via the app's Settings → Start with Windows (registers the task from XML).
 - GCC logon task `GCC`: **DISABLED** (by design; GCC stays installed — its `CPUOC.dll`/`YccDrvv3.dll` are used for CPU power limits). Undo: `schtasks /Change /TN GCC /ENABLE`.
 - App is not running (killed during recovery).
 
