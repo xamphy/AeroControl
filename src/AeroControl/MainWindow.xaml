@@ -80,7 +80,6 @@
 
                 <StackPanel DockPanel.Dock="Bottom" Margin="8,0">
                     <TextBlock Text="{Binding BatteryText}" Style="{StaticResource SubText}" FontSize="11" />
-                    <TextBlock Text="Running alongside GIGABYTE Control Center" Style="{StaticResource SubText}" FontSize="11" Margin="0,4,0,0" />
                 </StackPanel>
             </DockPanel>
         </Border>

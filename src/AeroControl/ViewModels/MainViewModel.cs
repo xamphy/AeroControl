@@ -205,6 +205,6 @@ public sealed class MainViewModel : Observable
         new InfoRow { Label = "Graphics", Value = "NVIDIA GeForce RTX 4050 Laptop" },
         new InfoRow { Label = "Display", Value = "14″ OLED · 2880 × 1800 · 90 Hz" },
         new InfoRow { Label = "Battery", Value = Health },
-        new InfoRow { Label = "Aero Control", Value = "0.1 · alongside GIGABYTE Control Center" },
+        new InfoRow { Label = "Aero Control", Value = "0.1" },
     };
 }
