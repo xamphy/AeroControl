@@ -1,4 +1,4 @@
-﻿# Aero Control — handoff (2026-11-25, 22:45)
+﻿# Aero Control — handoff (2026-11-25, 23:00)
 
 Replacement UI for GIGABYTE Control Center (GCC) on the user's **AERO 14 OLED BMF** (i7-13620H, RTX 4050,
 2880×1800 90/60 Hz OLED, white backlit keyboard). macOS-styled WPF app, .NET Framework 4.8, runs elevated.
@@ -16,6 +16,15 @@ dragging the slider, switching modes and pressing Fn+Space in the app: no trips.
 Startup: release installed and `AeroControl` logon task re-registered at 22:44 (`tools/install.ps1 -Startup`,
 or `AeroControl.exe --startup on|off`). GCC's `GCC` logon task stays DISABLED (undo: `schtasks /Change /TN GCC /ENABLE`).
 
+## Since 22:45 (user approved)
+
+- Volume keys (05bde07): `Input/MediaKeyHook.cs` low-level hook swallows VK 0xAD/0xAE/0xAF so the Windows flyout
+  never shows; `Speakers` (Microphone.cs) steps 2%, up unmutes. User confirmed: no Windows popup.
+- Fn popup (bf83e4d): `Views/OsdWindow.cs` is now a macOS-style card in the top-right corner, slides in from the
+  right. User liked it. `--shot` also renders `osd-level.png` / `osd-state.png`.
+- Airplane key: left to Windows (radio HID collection, no interceptable key; disabling the device node is risky).
+- Fn+F12: GCC toggled AI Boost (per-app automatic profiles). User: skip for now. Idea if revisited: "Auto" mode.
+
 ## What works (verified on hardware, GCC closed)
 
 | Area | Notes |
@@ -29,7 +38,7 @@ or `AeroControl.exe --startup on|off`). GCC's `GCC` logon task stays DISABLED (u
 | Icon | user's `Desktop\appicon.png` logo rebuilt as vector, plain white (`tools/make-icon.ps1`) |
 
 Not yet tested: fan-curve editor write.
-Open question to user: **what should Fn+F12 (`0x88`) do?** (GCC never handled it.) Options offered: cycle
+Fn+F12 (`0x88`): GCC used it for AI Boost on/off; user said skip for now. Options offered: cycle
 Windows power mode / same as Fn+Esc / nothing.
 Removed by user request: battery cycle count (firmware `getBattCyc1`=92 is unverified; Windows reports 0) — don't re-add.
 
