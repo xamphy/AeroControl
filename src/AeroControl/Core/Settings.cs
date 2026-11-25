@@ -33,7 +33,7 @@ public sealed class Settings
     [DataMember] public int[] KbPerMode = { 0, 50, 100, 100 }; // silent, balanced, performance, turbo
 
     // App
-    [DataMember] public bool StartWithWindows = true;
+    [DataMember] public bool StartWithWindows = false; // the logon task is only created when you switch this on
     [DataMember] public bool DarkAppearance = true;
     [DataMember] public string Accent = "#0A84FF";
 
