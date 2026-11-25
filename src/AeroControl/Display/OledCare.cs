@@ -75,6 +75,8 @@ public sealed class OledCare : IDisposable
     public bool PixelShiftEnabled { get; set; }
     public bool AscEnabled { get; set; }
 
+    // AEROCONTROL_FASTOLED=1 shrinks the idle thresholds 30x for testing (5 min -> 10 s, 30 min -> 60 s).
+    private static readonly int Div = Environment.GetEnvironmentVariable("AEROCONTROL_FASTOLED") == "1" ? 30 : 1;
     private readonly Timer _timer;
     private int _shiftStep;
     private long _lastShiftIdle;
@@ -86,8 +88,11 @@ public sealed class OledCare : IDisposable
         _timer = new Timer(_ => Tick(), null, 1000, 1000);
     }
 
+    private int _busy;
+
     private void Tick()
     {
+        if (Interlocked.Exchange(ref _busy, 1) == 1) return; // a fade is still running
         try
         {
             int idle = IdleSeconds();
@@ -98,37 +103,51 @@ public sealed class OledCare : IDisposable
                 if (idle <= 1 && _ascRestore >= 0)
                 {
                     Panel.SetBrightness(_ascRestore);
+                    Log.Write($"ASC: input, restored {_ascRestore}");
                     _ascRestore = -1; _ascLevel = 0;
                 }
-                else if (idle >= 300 && _ascLevel == 0) Dim(5, 1);
-                else if (idle >= 600 && _ascLevel == 1) Dim(10, 2);
+                else if (idle >= 300 / Div && _ascLevel == 0) { Dim(0.7, 1); Log.Write($"ASC: idle {idle}s, faded to 70%"); }
+                else if (idle >= 600 / Div && _ascLevel == 1) { Dim(0.5, 2); Log.Write($"ASC: idle {idle}s, faded to 35%"); }
             }
             else if (_ascRestore >= 0) { Panel.SetBrightness(_ascRestore); _ascRestore = -1; _ascLevel = 0; }
 
             // Pixel Shift: idle > 30 min, then every 3 min
-            if (PixelShiftEnabled && idle > 1800 && idle - _lastShiftIdle >= 180)
+            if (PixelShiftEnabled && idle > 1800 / Div && idle - _lastShiftIdle >= 180 / Div)
             {
                 _lastShiftIdle = idle;
                 var (x, y) = (_shiftStep++ % 4) switch { 0 => (1, 0), 1 => (1, 1), 2 => (0, 1), _ => (0, 0) };
                 MoveDesktopIcons(x, y);
+                Log.Write($"Pixel shift: idle {idle}s, icons to ({x},{y})");
             }
-            else if (idle < 1800 && _lastShiftIdle != 0)
+            else if (idle < 1800 / Div && _lastShiftIdle != 0)
             {
                 _lastShiftIdle = 0;
             }
         }
         catch (Exception ex) { Log.Write("OledCare tick: " + ex.Message); }
+        finally { Interlocked.Exchange(ref _busy, 0); }
     }
 
-    private void Dim(int by, int level)
+    /// <summary>
+    /// GCC's ASC (GeneralVD.AscAdjustFunction): at 5 min fade to 70% of the current brightness, at 10 min fade
+    /// to half of that; each fade steps 1% at a time over about 3 s. Input restores the original level.
+    /// </summary>
+    private void Dim(double factor, int level)
     {
         int now = Panel.GetBrightness();
         if (now <= 0) return;
         if (_ascRestore < 0) _ascRestore = now;
-        Panel.SetBrightness(Math.Max(0, _ascRestore - by));
+        int target = (int)Math.Round(now * factor);
         _ascLevel = level;
+        int steps = Math.Max(1, now - target);
+        int delay = Math.Max(10, 3000 / steps);
+        for (int b = now - 1; b >= target; b--)
+        {
+            if (IdleSeconds() <= 1) return; // user is back; the next tick restores
+            Panel.SetBrightness(b);
+            Thread.Sleep(delay);
+        }
     }
-
     private static void MoveDesktopIcons(int left, int top)
     {
         IntPtr lv = IntPtr.Zero;

@@ -163,32 +163,54 @@ public static class Panel
         SetRefreshRate(onAc ? rates.First() : rates.Last());
     }
 
-    // ---- brightness (standard Windows WMI, same values GCC stores as acL/dcL) ----
+    // ---- brightness ----
+    // GCC (CPOWERAPI.SetBrightness) writes the active power plan's display-brightness value for the current
+    // power source and re-activates the plan; that is the path the Windows brightness slider uses and the one
+    // this OLED panel honours. (WmiMonitorBrightnessMethods.WmiSetBrightness is ignored by it.)
+
+    private static readonly Guid VideoSubgroup = new("7516b95f-f776-4464-8c53-06167f40cc99");
+    private static readonly Guid VideoBrightness = new("aded5e82-b909-4619-9949-f5d71dac0bcb");
 
     public static int GetBrightness()
     {
+        if (PowerGetActiveScheme(IntPtr.Zero, out var pScheme) != 0) return -1;
         try
         {
-            foreach (ManagementObject o in new ManagementObjectSearcher(@"root\WMI", "SELECT CurrentBrightness FROM WmiMonitorBrightness").Get())
-                return Convert.ToInt32(o["CurrentBrightness"]);
+            var scheme = Marshal.PtrToStructure<Guid>(pScheme);
+            var sub = VideoSubgroup; var set = VideoBrightness;
+            uint v = 0;
+            uint r = Hardware.Sensors.OnAc
+                ? PowerReadACValueIndex(IntPtr.Zero, ref scheme, ref sub, ref set, out v)
+                : PowerReadDCValueIndex(IntPtr.Zero, ref scheme, ref sub, ref set, out v);
+            return r == 0 ? (int)v : -1;
         }
-        catch { }
-        return -1;
+        finally { LocalFree(pScheme); }
     }
 
     public static void SetBrightness(int percent)
     {
         percent = Math.Max(0, Math.Min(100, percent));
+        if (PowerGetActiveScheme(IntPtr.Zero, out var pScheme) != 0) { Log.Write("SetBrightness: no active scheme"); return; }
         try
         {
-            foreach (ManagementObject o in new ManagementObjectSearcher(@"root\WMI", "SELECT * FROM WmiMonitorBrightnessMethods").Get())
-            {
-                o.InvokeMethod("WmiSetBrightness", new object[] { (uint)1, (byte)percent });
-                return;
-            }
+            var scheme = Marshal.PtrToStructure<Guid>(pScheme);
+            var sub = VideoSubgroup; var set = VideoBrightness;
+            uint r = Hardware.Sensors.OnAc
+                ? PowerWriteACValueIndex(IntPtr.Zero, ref scheme, ref sub, ref set, (uint)percent)
+                : PowerWriteDCValueIndex(IntPtr.Zero, ref scheme, ref sub, ref set, (uint)percent);
+            uint a = PowerSetActiveScheme(IntPtr.Zero, ref scheme);
+            if (r != 0 || a != 0) Log.Write($"SetBrightness({percent}) write={r} activate={a}");
         }
-        catch (Exception ex) { Log.Write("SetBrightness failed: " + ex.Message); }
+        finally { LocalFree(pScheme); }
     }
+
+    [DllImport("powrprof.dll")] private static extern uint PowerGetActiveScheme(IntPtr root, out IntPtr scheme);
+    [DllImport("powrprof.dll")] private static extern uint PowerSetActiveScheme(IntPtr root, ref Guid scheme);
+    [DllImport("powrprof.dll")] private static extern uint PowerReadACValueIndex(IntPtr root, ref Guid scheme, ref Guid sub, ref Guid set, out uint v);
+    [DllImport("powrprof.dll")] private static extern uint PowerReadDCValueIndex(IntPtr root, ref Guid scheme, ref Guid sub, ref Guid set, out uint v);
+    [DllImport("powrprof.dll")] private static extern uint PowerWriteACValueIndex(IntPtr root, ref Guid scheme, ref Guid sub, ref Guid set, uint v);
+    [DllImport("powrprof.dll")] private static extern uint PowerWriteDCValueIndex(IntPtr root, ref Guid scheme, ref Guid sub, ref Guid set, uint v);
+    [DllImport("kernel32.dll")] private static extern IntPtr LocalFree(IntPtr p);
 
     // ---- interop ----
 
