@@ -1,7 +1,7 @@
-# Decompiled GIGABYTE code: local reference only, never commit
+﻿# Decompiled GIGABYTE code: local reference only, never commit
 re/
 bin/
 obj/
 *.user
 .vs/
-probe-*.json
+probe-*.txt
