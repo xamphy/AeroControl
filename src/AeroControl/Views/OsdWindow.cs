@@ -11,19 +11,23 @@ using System.Windows.Threading;
 namespace AeroControl.Views;
 
 /// <summary>
-/// macOS-style HUD for Fn keys (replaces GCC's OSDwindow popups): a translucent rounded square in the
-/// lower middle of the screen with an icon, a title and either a 16-segment level bar or a status line.
-/// Never takes focus, is click-through, and re-uses itself while visible.
+/// macOS-style popup for Fn keys (replaces GCC's OSDwindow and the Windows volume flyout): a translucent
+/// notification card in the top-right corner, like macOS's Control Center HUDs. Icon tile on the left; title
+/// with the value on the right, and below it a level bar or a status line. Slides in from the right, never
+/// takes focus, is click-through, and re-uses itself while visible.
 /// </summary>
 public sealed class OsdWindow : Window
 {
-    private const int Segments = 16;
-    private readonly AeroControl.Views.Icon _icon = new() { Width = 64, Height = 64, Thickness = 1.6 };
-    private readonly TextBlock _title = new() { FontSize = 15, FontWeight = FontWeights.SemiBold, HorizontalAlignment = HorizontalAlignment.Center, Margin = new Thickness(0, 14, 0, 0) };
-    private readonly TextBlock _status = new() { FontSize = 13, HorizontalAlignment = HorizontalAlignment.Center, Margin = new Thickness(0, 10, 0, 0) };
-    private readonly StackPanel _bar = new() { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Center, Margin = new Thickness(0, 14, 0, 0) };
-    private readonly Border[] _cells = new Border[Segments];
-    private readonly DispatcherTimer _hide = new() { Interval = TimeSpan.FromMilliseconds(1500) };
+    private const double CardW = 320, Shadow = 18, Gap = 10;
+    private readonly AeroControl.Views.Icon _icon = new() { Width = 22, Height = 22, Thickness = 1.8, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
+    private readonly TextBlock _title = new() { FontSize = 13, FontWeight = FontWeights.SemiBold, VerticalAlignment = VerticalAlignment.Center };
+    private readonly TextBlock _value = new() { FontSize = 12, HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = VerticalAlignment.Center };
+    private readonly TextBlock _status = new() { FontSize = 12, Margin = new Thickness(0, 3, 0, 0) };
+    private readonly Grid _bar = new() { Height = 6, Margin = new Thickness(0, 8, 0, 0) };
+    private readonly Border _fill = new() { CornerRadius = new CornerRadius(3), HorizontalAlignment = HorizontalAlignment.Left };
+    private readonly TranslateTransform _slide = new();
+    private readonly DispatcherTimer _hide = new() { Interval = TimeSpan.FromMilliseconds(1600) };
+    private double _level;
 
     public OsdWindow()
     {
@@ -34,31 +38,45 @@ public sealed class OsdWindow : Window
         ShowActivated = false;
         Topmost = true;
         ResizeMode = ResizeMode.NoResize;
-        Width = 236; Height = 236;
+        SizeToContent = SizeToContent.Height;
+        Width = CardW + 2 * Shadow;
         Focusable = false;
 
-        for (int i = 0; i < Segments; i++)
-        {
-            _cells[i] = new Border { Width = 8, Height = 6, Margin = new Thickness(1), CornerRadius = new CornerRadius(1.5) };
-            _bar.Children.Add(_cells[i]);
-        }
+        var track = new Border { CornerRadius = new CornerRadius(3) };
+        track.SetResourceReference(Border.BackgroundProperty, "Field");
+        _fill.SetResourceReference(Border.BackgroundProperty, "Text");
+        _bar.Children.Add(track);
+        _bar.Children.Add(_fill);
+        _bar.SizeChanged += (_, _) => { _fill.BeginAnimation(WidthProperty, null); _fill.Width = _bar.ActualWidth * _level; };
+
         _title.SetResourceReference(TextBlock.ForegroundProperty, "Text");
+        _value.SetResourceReference(TextBlock.ForegroundProperty, "Sub");
         _status.SetResourceReference(TextBlock.ForegroundProperty, "Sub");
         _icon.SetResourceReference(AeroControl.Views.Icon.StrokeProperty, "Text");
-        _title.SetResourceReference(TextBlock.FontFamilyProperty, "UiFont");
-        _status.SetResourceReference(TextBlock.FontFamilyProperty, "UiFont");
+        foreach (var t in new[] { _title, _value, _status }) t.SetResourceReference(TextBlock.FontFamilyProperty, "UiFont");
 
-        var stack = new StackPanel { VerticalAlignment = VerticalAlignment.Center, HorizontalAlignment = HorizontalAlignment.Center };
-        stack.Children.Add(_icon);
-        stack.Children.Add(_title);
-        stack.Children.Add(_bar);
-        stack.Children.Add(_status);
+        var tile = new Border { Width = 38, Height = 38, CornerRadius = new CornerRadius(10), Child = _icon, VerticalAlignment = VerticalAlignment.Center };
+        tile.SetResourceReference(Border.BackgroundProperty, "Field");
+
+        var head = new Grid();
+        head.Children.Add(_title);
+        head.Children.Add(_value);
+        var text = new StackPanel { VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(12, 0, 0, 0) };
+        text.Children.Add(head);
+        text.Children.Add(_bar);
+        text.Children.Add(_status);
+
+        var row = new DockPanel();
+        DockPanel.SetDock(tile, Dock.Left);
+        row.Children.Add(tile);
+        row.Children.Add(text);
 
         var card = new Border
         {
-            Width = 200, Height = 200, CornerRadius = new CornerRadius(22), BorderThickness = new Thickness(1),
-            Child = stack,
-            Effect = new DropShadowEffect { BlurRadius = 24, ShadowDepth = 6, Opacity = 0.4 },
+            Width = CardW, CornerRadius = new CornerRadius(18), BorderThickness = new Thickness(1),
+            Padding = new Thickness(12, 11, 16, 11), Margin = new Thickness(Shadow),
+            Child = row, RenderTransform = _slide,
+            Effect = new DropShadowEffect { BlurRadius = 22, ShadowDepth = 4, Direction = 270, Opacity = 0.35 },
         };
         card.SetResourceReference(Border.BackgroundProperty, "Panel");
         card.SetResourceReference(Border.BorderBrushProperty, "Line");
@@ -67,9 +85,11 @@ public sealed class OsdWindow : Window
         _hide.Tick += (_, _) =>
         {
             _hide.Stop();
-            var fade = new DoubleAnimation(0, TimeSpan.FromMilliseconds(250));
+            var fade = new DoubleAnimation(0, TimeSpan.FromMilliseconds(220));
             fade.Completed += (_, _) => { if (!_hide.IsEnabled) Hide(); };
             BeginAnimation(OpacityProperty, fade);
+            _slide.BeginAnimation(TranslateTransform.XProperty,
+                new DoubleAnimation(16, TimeSpan.FromMilliseconds(220)) { EasingFunction = new CubicEase { EasingMode = EasingMode.EaseIn } });
         };
         SourceInitialized += (_, _) =>
         {
@@ -79,14 +99,17 @@ public sealed class OsdWindow : Window
         };
     }
 
-    /// <summary>Show a level (0..100) with a segmented bar.</summary>
+    /// <summary>Show a level (0..100) with a bar.</summary>
     public void ShowLevel(string iconPath, string title, int percent)
     {
-        int lit = (int)Math.Round(Math.Max(0, Math.Min(100, percent)) / 100.0 * Segments);
-        for (int i = 0; i < Segments; i++)
-            _cells[i].SetResourceReference(Border.BackgroundProperty, i < lit ? "Text" : "Field");
+        _level = Math.Max(0, Math.Min(100, percent)) / 100.0;
         _bar.Visibility = Visibility.Visible;
-        _status.Text = $"{percent}%";
+        _status.Visibility = Visibility.Collapsed;
+        _value.Text = $"{percent}%";
+        // glide the fill when the card is already up (repeated presses); otherwise set it directly
+        if (IsVisible && _bar.ActualWidth > 0)
+            _fill.BeginAnimation(WidthProperty, new DoubleAnimation(_bar.ActualWidth * _level, TimeSpan.FromMilliseconds(90)));
+        else { _fill.BeginAnimation(WidthProperty, null); _fill.Width = _bar.ActualWidth * _level; }
         Present(iconPath, title);
     }
 
@@ -94,7 +117,9 @@ public sealed class OsdWindow : Window
     public void ShowState(string iconPath, string title, string status)
     {
         _bar.Visibility = Visibility.Collapsed;
+        _status.Visibility = Visibility.Visible;
         _status.Text = status;
+        _value.Text = "";
         Present(iconPath, title);
     }
 
@@ -102,12 +127,19 @@ public sealed class OsdWindow : Window
     {
         _icon.Data = iconPath;
         _title.Text = title;
+        // top-right corner of the work area; the window is larger than the card by the shadow margin
         var wa = SystemParameters.WorkArea;
-        Left = wa.Left + (wa.Width - Width) / 2;
-        Top = wa.Bottom - Height - 90;
+        Left = wa.Right - Width + Shadow - Gap;
+        Top = wa.Top + Gap - Shadow;
         BeginAnimation(OpacityProperty, null);
-        if (!IsVisible) { Opacity = 0; Show(); BeginAnimation(OpacityProperty, new DoubleAnimation(1, TimeSpan.FromMilliseconds(120))); }
-        else Opacity = 1;
+        if (!IsVisible)
+        {
+            Opacity = 0; Show();
+            BeginAnimation(OpacityProperty, new DoubleAnimation(1, TimeSpan.FromMilliseconds(160)));
+            _slide.BeginAnimation(TranslateTransform.XProperty,
+                new DoubleAnimation(40, 0, TimeSpan.FromMilliseconds(260)) { EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut } });
+        }
+        else { Opacity = 1; _slide.BeginAnimation(TranslateTransform.XProperty, null); _slide.X = 0; }
         _hide.Stop(); _hide.Start();
     }
 

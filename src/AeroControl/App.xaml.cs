@@ -139,6 +139,15 @@ public partial class App : Application
         _popover.Toggle();
         await System.Threading.Tasks.Task.Delay(600);
         Save(_popover, Path.Combine(dir, "popover.png"));
+        var osd = new Views.OsdWindow();
+        osd.ShowLevel("M4 9h4l5-4v14l-5-4H4zM16 9a4 4 0 0 1 0 6M18.5 6.5a8 8 0 0 1 0 11", "Volume", 48);
+        await System.Threading.Tasks.Task.Delay(600);
+        osd.ShowLevel("M4 9h4l5-4v14l-5-4H4zM16 9a4 4 0 0 1 0 6M18.5 6.5a8 8 0 0 1 0 11", "Volume", 48);
+        await System.Threading.Tasks.Task.Delay(300);
+        Save(osd, Path.Combine(dir, "osd-level.png"));
+        osd.ShowState("M4 5h16v14H4zM4 15h16M12 15v4", "Touchpad", "Off");
+        await System.Threading.Tasks.Task.Delay(400);
+        Save(osd, Path.Combine(dir, "osd-state.png"));
         Quit();
 
         static void Save(Window w, string file)
@@ -146,12 +155,13 @@ public partial class App : Application
             w.UpdateLayout();
             var root = (FrameworkElement)w.Content;
             var dpi = System.Windows.Media.VisualTreeHelper.GetDpi(w);
+            double fw = root.ActualWidth + root.Margin.Left + root.Margin.Right, fh = root.ActualHeight + root.Margin.Top + root.Margin.Bottom;
             var rtb = new System.Windows.Media.Imaging.RenderTargetBitmap(
-                (int)(root.ActualWidth * dpi.DpiScaleX), (int)(root.ActualHeight * dpi.DpiScaleY), dpi.PixelsPerInchX, dpi.PixelsPerInchY,
+                (int)(fw * dpi.DpiScaleX), (int)(fh * dpi.DpiScaleY), dpi.PixelsPerInchX, dpi.PixelsPerInchY,
                 System.Windows.Media.PixelFormats.Pbgra32);
             var bg = new System.Windows.Media.DrawingVisual();
             using (var dc = bg.RenderOpen())
-                dc.DrawRectangle(w.Background is System.Windows.Media.SolidColorBrush b && b.Color.A > 0 ? b : System.Windows.Media.Brushes.Black, null, new Rect(0, 0, root.ActualWidth, root.ActualHeight));
+                dc.DrawRectangle(w.Background is System.Windows.Media.SolidColorBrush b && b.Color.A > 0 ? b : System.Windows.Media.Brushes.Black, null, new Rect(0, 0, fw, fh));
             rtb.Render(bg);
             rtb.Render(root);
             var enc = new System.Windows.Media.Imaging.PngBitmapEncoder();
