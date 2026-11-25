@@ -45,17 +45,65 @@ public sealed class KeyboardLight : IDisposable
         return b;
     }
 
-    /// <summary>Raw query: sends a query command and returns the 9-byte reply.</summary>
-    public byte[] Query(byte cmd)
+    // ---- HID safety (incident 2026-11-25: a 0x88 query sent right after a 0x08 write hung for 5 s
+    //      and the whole internal keyboard dropped off the bus until a power cycle) ----
+    private const int SettleMs = 65;           // GCC's IteKeyBoard.SetLightEffect_Kb sleeps 65 ms after every write
+    private const int QuietAfterWriteMs = 1500; // never query this soon after a write
+    private const int SlowCallMs = 500;        // any call slower than this trips the breaker
+    private readonly object _io = new();
+    private long _lastWriteTick = long.MinValue / 2;
+
+    /// <summary>True once a HID call failed or was slow: all keyboard traffic stops for the rest of the session.</summary>
+    public bool Tripped { get; private set; }
+    public string TripReason { get; private set; }
+
+    private void Trip(string why)
     {
-        var p = Packet(cmd);
-        if (!Hid.HidD_SetFeature(_h, p, p.Length)) return null;
-        System.Threading.Thread.Sleep(15);
-        var r = new byte[9];
-        return Hid.HidD_GetFeature(_h, r, r.Length) ? r : null;
+        if (Tripped) return;
+        Tripped = true; TripReason = why;
+        Log.Write($"KEYBOARD HID DISABLED for this session: {why}");
     }
 
-    /// <summary>Current brightness 0..100 (null if the keyboard did not answer).</summary>
+    private bool Call(string what, Func<bool> io)
+    {
+        if (Tripped) return false;
+        var sw = System.Diagnostics.Stopwatch.StartNew();
+        bool ok;
+        try { ok = io(); }
+        catch (Exception ex) { Trip($"{what} threw {ex.Message}"); return false; }
+        long ms = sw.ElapsedMilliseconds;
+        if (!ok) Trip($"{what} failed (err {Marshal.GetLastWin32Error()}, {ms} ms)");
+        else if (ms > SlowCallMs) Trip($"{what} took {ms} ms");
+        return ok && !Tripped;
+    }
+
+    private bool Write(string what, byte[] p)
+    {
+        lock (_io)
+        {
+            bool ok = Call(what, () => Hid.HidD_SetFeature(_h, p, p.Length));
+            _lastWriteTick = Environment.TickCount;
+            System.Threading.Thread.Sleep(SettleMs);
+            return ok;
+        }
+    }
+
+    /// <summary>Raw query: sends a query command and returns the 9-byte reply (null if refused or failed).</summary>
+    public byte[] Query(byte cmd)
+    {
+        lock (_io)
+        {
+            if (Tripped) return null;
+            if (unchecked(Environment.TickCount - _lastWriteTick) < QuietAfterWriteMs) return null;
+            var p = Packet(cmd);
+            if (!Call($"query 0x{cmd:X2} set", () => Hid.HidD_SetFeature(_h, p, p.Length))) return null;
+            System.Threading.Thread.Sleep(SettleMs);
+            var r = new byte[9];
+            return Call($"query 0x{cmd:X2} get", () => Hid.HidD_GetFeature(_h, r, r.Length)) ? r : null;
+        }
+    }
+
+    /// <summary>Current brightness 0..100 (null if the keyboard did not answer or a query is not safe now).</summary>
     public int? GetBrightness()
     {
         var r = Query(0x88);
@@ -66,16 +114,11 @@ public sealed class KeyboardLight : IDisposable
     public bool SetBrightness(int percent)
     {
         percent = Math.Max(0, Math.Min(100, percent));
-        var p = Packet(0x08, 0, 0, 0, (byte)(percent / 2), 0, 0);
-        return Hid.HidD_SetFeature(_h, p, p.Length);
+        return Write($"set {percent}%", Packet(0x08, 0, 0, 0, (byte)(percent / 2), 0, 0));
     }
 
     /// <summary>Keyboard-side "turn off after one minute without typing" (command 0x0A).</summary>
-    public bool SetAutoOff(bool on)
-    {
-        var p = Packet(0x0A, (byte)(on ? 1 : 0));
-        return Hid.HidD_SetFeature(_h, p, p.Length);
-    }
+    public bool SetAutoOff(bool on) => Write($"auto-off {on}", Packet(0x0A, (byte)(on ? 1 : 0)));
 
     public void Dispose() => _h?.Dispose();
 }
@@ -100,8 +143,8 @@ internal static class Hid
 
     [DllImport("hid.dll")] private static extern void HidD_GetHidGuid(out Guid g);
     [DllImport("hid.dll")] public static extern bool HidD_GetAttributes(SafeFileHandle h, ref HIDD_ATTRIBUTES a);
-    [DllImport("hid.dll")] public static extern bool HidD_SetFeature(SafeFileHandle h, byte[] buf, int len);
-    [DllImport("hid.dll")] public static extern bool HidD_GetFeature(SafeFileHandle h, byte[] buf, int len);
+    [DllImport("hid.dll", SetLastError = true)] public static extern bool HidD_SetFeature(SafeFileHandle h, byte[] buf, int len);
+    [DllImport("hid.dll", SetLastError = true)] public static extern bool HidD_GetFeature(SafeFileHandle h, byte[] buf, int len);
     [DllImport("hid.dll")] private static extern bool HidD_GetPreparsedData(SafeFileHandle h, out IntPtr data);
     [DllImport("hid.dll")] private static extern bool HidD_FreePreparsedData(IntPtr data);
     [DllImport("hid.dll")] private static extern int HidP_GetCaps(IntPtr data, out HIDP_CAPS caps);

@@ -82,10 +82,13 @@ public sealed class Controller : IDisposable
             Settings.KbPerMode[CurrentMode.Index] = percent;
             Settings.Save();
         }
-        Enqueue(() => _kb?.SetBrightness(percent));
+        Enqueue(() => { bool ok = _kb?.SetBrightness(percent) ?? false; Log.Write($"Keyboard slider -> {percent}% ok={ok}"); });
     }
 
     public void SetBrightness(int percent) => Enqueue(() => Panel.SetBrightness(percent));
+
+    /// <summary>The keyboard changed its own level and reported it (Fn+Space): just record it, no HID traffic.</summary>
+    public void KeyboardReported(int percent, Action done) => Enqueue(() => { KeyboardLevel = percent; done(); });
 
     /// <summary>Read the keyboard backlight on the worker (after the keyboard changed it itself) and report back.</summary>
     public void ReadKeyboard(Action<int> done) => Enqueue(() =>
@@ -140,7 +143,7 @@ public sealed class Controller : IDisposable
             KeyboardLevel = lvl;
         }
         // Read back what the hardware now reports, for verification
-        Log.Write($"  readback: fans={Fans.ReadMode()?.ToString() ?? "?"} windows={WindowsPowerMode.Get()} kb={_kb?.GetBrightness()?.ToString() ?? "?"} pl={CpuPower.ReadLimits()}");
+        Log.Write($"  readback: fans={Fans.ReadMode()?.ToString() ?? "?"} windows={WindowsPowerMode.Get()} kb={(_kb == null ? "none" : _kb.Tripped ? "disabled" : KeyboardLevel + "% (sent, not read back)")} pl={CpuPower.ReadLimits()}");
         StateChanged?.Invoke();
     }
 

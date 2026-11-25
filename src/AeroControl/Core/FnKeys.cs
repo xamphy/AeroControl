@@ -79,7 +79,7 @@ public sealed class FnKeys : IDisposable
                 {
                     // the keyboard already changed its own level; the report carries it
                     _osd.ShowLevel(IcoKeyboard, "Keyboard", e.Value);
-                    _c.ReadKeyboard(_ => _ui.BeginInvoke(_refreshUi));
+                    _c.KeyboardReported(e.Value, () => _ui.BeginInvoke(_refreshUi));
                 }
                 else
                     _c.ReadKeyboard(lvl => _ui.BeginInvoke(new Action(() =>

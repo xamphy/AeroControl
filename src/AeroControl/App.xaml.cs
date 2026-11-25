@@ -161,13 +161,16 @@ public partial class App : Application
         if (kb == null) { Log.Write("kbtest: keyboard not found"); return 2; }
         Log.Write($"kbtest start, GCC processes={System.Diagnostics.Process.GetProcessesByName("GCC").Length}, initial={kb.GetBrightness()}");
         var sw = System.Diagnostics.Stopwatch.StartNew();
-        foreach (int lv in new[] { 100, 0, 50, 0, 20, 100 })
+        // the 2026-11-25 incident pattern: write then immediately query. The query must now be refused locally.
+        foreach (int lv in new[] { 100, 32, 100, 64, 0, 100 })
         {
+            var t0 = sw.ElapsedMilliseconds;
             bool ok = kb.SetBrightness(lv);
-            Thread.Sleep(100);
             var r1 = kb.GetBrightness();
-            Thread.Sleep(1900);
-            Log.Write($"kbtest t={sw.ElapsedMilliseconds - 2000,5}ms set {lv,3}% ok={ok} read@0.1s={r1} read@2s={kb.GetBrightness()}");
+            Thread.Sleep(1600);
+            var r2 = kb.GetBrightness();
+            Log.Write($"kbtest set {lv,3}% ok={ok} write={sw.ElapsedMilliseconds - t0 - 1600}ms immediate-read={r1?.ToString() ?? "refused"} read@1.6s={r2?.ToString() ?? "null"} tripped={kb.Tripped}");
+            if (kb.Tripped) return 3;
         }
         return 0;
     }
@@ -183,10 +186,13 @@ public partial class App : Application
             long t = sw.ElapsedMilliseconds;
             double x = t < half ? (double)t / half : 1.0 - (double)(t - half) / half;
             int level = (int)Math.Round(x * 50) * 2;
-            if (level != last) { kb.SetBrightness(level); last = level; }
+            if (level != last) { if (!kb.SetBrightness(level)) break; last = level; }
             Thread.Sleep(20);
         }
-        kb.SetBrightness(0);
-        return 0;
+        Log.Write($"kbsweep writes done in {sw.ElapsedMilliseconds} ms, tripped={kb.Tripped} {kb.TripReason}");
+        kb.SetBrightness(100);
+        Thread.Sleep(1600);
+        Log.Write($"kbsweep read@1.6s={kb.GetBrightness()?.ToString() ?? "null"} tripped={kb.Tripped} {kb.TripReason}");
+        return kb.Tripped ? 3 : 0;
     }
 }
