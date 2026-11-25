@@ -1,0 +1,6 @@
+<Window x:Class="AeroControl.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Aero Control" Width="960" Height="640" Background="{StaticResource Bg}">
+    <TextBlock Text="Aero Control" Foreground="White" HorizontalAlignment="Center" VerticalAlignment="Center" />
+</Window>
