@@ -40,6 +40,12 @@ flat 30% → duty 30/30%, ~2,800 rpm; then the mode's own fans restored. PASS.
 `--shot` now runs beside a running instance (no mutex, no keyboard HID, no Fn keys); run unelevated with
 `__COMPAT_LAYER=RunAsInvoker` to skip UAC (sensors then show "–"). Also renders `main-perf-curve.png`.
 
+**Fan-off zone** (user asked after the pass): Fans off below Never/50/55/60 °C, shown when the custom curve is on.
+`Settings.EffectiveCurve()` zeroes points below the threshold, moves the highest of them to the threshold, and lifts
+running points to >= 35% (spin-up from standstill verified at 35%; lower untested). Verified with `--fanofftest`:
+0% → 0 rpm at 43 °C idle; CPU load crossed 50 °C → fans restarted within ~1 s (35%, 2,557 rpm); EC has its own
+hysteresis (kept 35% down to ~44 °C, then stopped once; no flapping over 60 s). Editor shades the zone.
+
 ## What works (verified on hardware, GCC closed)
 
 | Area | Notes |

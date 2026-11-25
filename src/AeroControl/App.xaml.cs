@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Threading;
@@ -51,6 +52,7 @@ public partial class App : Application
         if (args.Contains("--kbtest")) { Shutdown(KbTest()); return; }
         if (args.Contains("--kbsweep")) { Shutdown(KbSweep(8000)); return; }
         if (args.Contains("--curvetest")) { Shutdown(CurveTest()); return; }
+        if (args.Contains("--fanofftest")) { Shutdown(FanOffTest()); return; }
 
         // ---- single instance: a second launch just shows the running one ----
         // (--shot renders alongside a running instance and never touches the keyboard or Fn keys)
@@ -144,10 +146,14 @@ public partial class App : Application
         var st = _controller.Settings;
         var saved = st.CustomCurve;
         st.CustomCurve = new[] { true, true, true, true };
+        int savedOff = st.FanOffBelow; st.FanOffBelow = 50;
         _vm.Page = "perf";
         await System.Threading.Tasks.Task.Delay(400);
+        FindScroll(_main)?.ScrollToEnd();
+        await System.Threading.Tasks.Task.Delay(300);
         Save(_main, Path.Combine(dir, "main-perf-curve.png"));
-        st.CustomCurve = saved;
+        FindScroll(_main)?.ScrollToHome();
+        st.CustomCurve = saved; st.FanOffBelow = savedOff;
         _popover.Toggle();
         await System.Threading.Tasks.Task.Delay(600);
         Save(_popover, Path.Combine(dir, "popover.png"));
@@ -161,6 +167,14 @@ public partial class App : Application
         await System.Threading.Tasks.Task.Delay(400);
         Save(osd, Path.Combine(dir, "osd-state.png"));
         Quit();
+
+        static System.Windows.Controls.ScrollViewer FindScroll(DependencyObject o)
+        {
+            if (o is System.Windows.Controls.ScrollViewer sv) return sv;
+            for (int i = 0; i < System.Windows.Media.VisualTreeHelper.GetChildrenCount(o); i++)
+                if (FindScroll(System.Windows.Media.VisualTreeHelper.GetChild(o, i)) is { } f) return f;
+            return null;
+        }
 
         static void Save(Window w, string file)
         {
@@ -227,6 +241,69 @@ public partial class App : Application
             Log.Write($"CURVETEST restored: fans={Hardware.Fans.ReadMode()} ({(fails == 0 ? "PASS" : "FAIL")})");
         }
         return fails;
+    }
+
+    /// <summary>
+    /// Fan-off zone on real hardware: 0% below a threshold a few degrees above the current CPU temperature, 35%+ above it.
+    /// A: idle 25 s, fans should stop. B: load every core until the CPU passes the threshold, fans must start again.
+    /// C: stop the load and watch 60 s of cool-down (does it cycle on/off at the boundary?). Aborts if the CPU passes
+    /// 85 °C with the fans still off. The mode's own fans and the saved curve are always put back.
+    /// </summary>
+    private static int FanOffTest()
+    {
+        var st = Core.Settings.Load();
+        var mode = Modes.ById(Hardware.Sensors.OnAc ? st.ModeAc : st.ModeDc);
+        var saved = st.CurveTemps.Zip(st.CurvePercents, (t, p) => (t, p)).ToList();
+        var s0 = Hardware.Sensors.Read();
+        int th = Math.Max(s0.CpuTemp, s0.GpuTemp) + 6;
+        var curve = new List<(int, int)> { (0, 0) };
+        for (int i = 0; i < 14; i++) curve.Add((th + i * 3, Math.Min(100, 35 + i * 5)));
+        Log.Write($"FANOFF start: mode {mode.Id}, cpu {s0.CpuTemp} gpu {s0.GpuTemp}, threshold {th} °C");
+        bool stopped = false, restarted = false, aborted = false; int transitions = 0;
+        var stop = new ManualResetEventSlim();
+        var load = new List<Thread>();
+        try
+        {
+            Hardware.Fans.Apply(Hardware.FanMode.Custom, 50, curve);
+            Log.Write($"FANOFF table [{string.Join(" ", Hardware.Fans.ReadCurve().Select(x => $"{x.temp}:{x.percent}"))}] mode={Hardware.Fans.ReadMode()}");
+            int lastOn = -1;
+            bool Sample(string phase, int sec)
+            {
+                var s = Hardware.Sensors.Read();
+                Log.Write($"FANOFF {phase} t+{sec}s: cpu {s.CpuTemp} gpu {s.GpuTemp} duty {s.Fan1Pct}/{s.Fan2Pct}% rpm {s.Fan1Rpm}/{s.Fan2Rpm}");
+                int on = s.Fan1Rpm > 300 || s.Fan2Rpm > 300 ? 1 : 0;
+                if (lastOn >= 0 && on != lastOn) transitions++;
+                lastOn = on;
+                if (phase == "A" && s.Fan1Rpm < 300 && s.Fan2Rpm < 300) stopped = true;
+                if (phase != "A" && stopped && on == 1) restarted = true;
+                if (s.CpuTemp >= 85 && on == 0) { aborted = true; Log.Write("FANOFF ABORT: hot with fans off"); return false; }
+                return true;
+            }
+            for (int i = 1; i <= 25; i++) { Thread.Sleep(1000); if (!Sample("A", i)) return 9; }
+            for (int c = 0; c < Environment.ProcessorCount; c++)
+            {
+                var t = new Thread(() => { double x = 1; while (!stop.IsSet) x = Math.Sqrt(x + 1.0001); }) { IsBackground = true, Priority = ThreadPriority.BelowNormal };
+                t.Start(); load.Add(t);
+            }
+            for (int i = 1; i <= 90; i++)
+            {
+                Thread.Sleep(1000);
+                if (!Sample("B", i)) return 9;
+                var s = Hardware.Sensors.Read();
+                if (restarted && i >= 10 && Math.Max(s.CpuTemp, s.GpuTemp) >= th + 4) break;
+            }
+            stop.Set();
+            transitions = 0;
+            for (int i = 1; i <= 60; i++) { Thread.Sleep(1000); if (!Sample("C", i)) return 9; }
+        }
+        finally
+        {
+            stop.Set();
+            Hardware.Fans.WriteCurve(saved);
+            Hardware.Fans.Apply(st.UsesCurve(mode.Index) ? Hardware.FanMode.Custom : mode.Fan, st.FixedFanPercent, saved);
+            Log.Write($"FANOFF restored: fans={Hardware.Fans.ReadMode()} stopped={stopped} restarted={restarted} cooldown on/off changes={transitions} aborted={aborted}");
+        }
+        return stopped && restarted ? 0 : 1;
     }
 
     private static int KbTest()

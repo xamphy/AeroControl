@@ -214,6 +214,11 @@ public sealed class MainViewModel : Observable
 
     // ---------- fan curve ----------
     public bool CustomCurve { get => Controller.Settings.UsesCurve(Current.Index); set => Controller.SetCustomCurve(value); }
+    public bool FanOffNone { get => Controller.Settings.FanOffBelow == 0; set { if (value) Controller.SetFanOffBelow(0); } }
+    public bool FanOff50 { get => Controller.Settings.FanOffBelow == 50; set { if (value) Controller.SetFanOffBelow(50); } }
+    public bool FanOff55 { get => Controller.Settings.FanOffBelow == 55; set { if (value) Controller.SetFanOffBelow(55); } }
+    public bool FanOff60 { get => Controller.Settings.FanOffBelow == 60; set { if (value) Controller.SetFanOffBelow(60); } }
+    public int FanOffBelow => Controller.Settings.FanOffBelow;
     public string CustomCurveHint => $"Replaces {Current.Name}'s fan profile with the curve below. Other modes keep their own.";
     public void CommitCurve() => Controller.SetFanCurve(Curve.Select(p => p.Temp).ToArray(), Curve.Select(p => p.Percent).ToArray());
 

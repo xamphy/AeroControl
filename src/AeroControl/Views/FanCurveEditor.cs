@@ -35,6 +35,10 @@ public sealed class FanCurveEditor : FrameworkElement
     public static readonly DependencyProperty CurrentTempProperty = DependencyProperty.Register(
         nameof(CurrentTemp), typeof(double), typeof(FanCurveEditor), new FrameworkPropertyMetadata(-1.0, FrameworkPropertyMetadataOptions.AffectsRender));
     public double CurrentTemp { get => (double)GetValue(CurrentTempProperty); set => SetValue(CurrentTempProperty, value); }
+    public static readonly DependencyProperty FanOffBelowProperty = DependencyProperty.Register(
+        nameof(FanOffBelow), typeof(int), typeof(FanCurveEditor), new FrameworkPropertyMetadata(0, FrameworkPropertyMetadataOptions.AffectsRender));
+    /// <summary>Fans are off below this temperature (0 = no zone): shaded, and the curve is drawn at 0% there.</summary>
+    public int FanOffBelow { get => (int)GetValue(FanOffBelowProperty); set => SetValue(FanOffBelowProperty, value); }
 
     public ObservableCollection<CurvePoint> Points { get => (ObservableCollection<CurvePoint>)GetValue(PointsProperty); set => SetValue(PointsProperty, value); }
     public Brush Accent { get => (Brush)GetValue(AccentProperty); set => SetValue(AccentProperty, value); }
@@ -90,8 +94,28 @@ public sealed class FanCurveEditor : FrameworkElement
             g.PolyLineTo(pts.Concat(new[] { new Point(r.Right, r.Top), new Point(r.Right, r.Bottom) }).ToList(), false, true);
         }
         var soft = Accent.Clone(); soft.Opacity = 0.16;
-        dc.DrawGeometry(soft, null, fill);
-        dc.DrawGeometry(null, new Pen(Accent, 2.5) { LineJoin = PenLineJoin.Round }, line);
+        double offX = FanOffBelow > TMin ? r.Left + (Math.Min(TMax, FanOffBelow) - TMin) / (TMax - TMin) * r.Width : r.Left;
+        if (offX > r.Left)
+        {
+            // the curve only counts from the threshold on; below it the fans are off
+            dc.PushClip(new RectangleGeometry(new Rect(offX, 0, Math.Max(0, ActualWidth - offX), ActualHeight)));
+            dc.DrawGeometry(soft, null, fill);
+            dc.DrawGeometry(null, new Pen(Accent, 2.5) { LineJoin = PenLineJoin.Round }, line);
+            dc.Pop();
+            var zone = LabelBrush.Clone(); zone.Opacity = 0.08;
+            dc.DrawRectangle(zone, null, new Rect(r.Left, r.Top, offX - r.Left, r.Height));
+            dc.DrawGeometry(null, new Pen(LabelBrush, 1) { DashStyle = new DashStyle(new double[] { 3, 3 }, 0) },
+                new LineGeometry(new Point(offX, r.Top), new Point(offX, r.Bottom)));
+            dc.DrawLine(new Pen(Accent, 2.5), new Point(r.Left, r.Bottom - 1), new Point(offX, r.Bottom - 1));
+            var off = Text($"Fans off below {FanOffBelow} °C", dpi);
+            if (off.Width < offX - r.Left - 8) dc.DrawText(off, new Point(r.Left + (offX - r.Left - off.Width) / 2, r.Top + r.Height * 0.45));
+            else dc.DrawText(off, new Point(offX + 6, r.Top + 4));
+        }
+        else
+        {
+            dc.DrawGeometry(soft, null, fill);
+            dc.DrawGeometry(null, new Pen(Accent, 2.5) { LineJoin = PenLineJoin.Round }, line);
+        }
 
         if (CurrentTemp > 0)
         {
@@ -105,6 +129,7 @@ public sealed class FanCurveEditor : FrameworkElement
                 break;
             }
             if (t >= Points[Points.Count - 1].Temp) pct = Math.Max(pct, Points[Points.Count - 1].Percent);
+            if (FanOffBelow > 0 && t < FanOffBelow) pct = 0;
             var at = new Point(r.Left + (Math.Max(TMin, Math.Min(TMax, t)) - TMin) / (TMax - TMin) * r.Width, r.Bottom - pct / 100.0 * r.Height);
             var dash = new Pen(LabelBrush, 1) { DashStyle = new DashStyle(new double[] { 3, 3 }, 0) };
             dc.DrawLine(dash, new Point(at.X, r.Bottom), at);
@@ -119,6 +144,7 @@ public sealed class FanCurveEditor : FrameworkElement
         for (int i = 0; i < pts.Count; i++)
         {
             double rad = i == _drag || i == _hover ? 7 : 5;
+            if (pts[i].X < offX - 0.5 && i != _drag && i != _hover) { var faded = Accent.Clone(); faded.Opacity = 0.35; dc.DrawEllipse(KnobFill, new Pen(faded, 1.5), pts[i], 4, 4); continue; }
             dc.DrawEllipse(KnobFill, new Pen(Accent, 2), pts[i], rad, rad);
         }
         if (_drag >= 0 || _hover >= 0)

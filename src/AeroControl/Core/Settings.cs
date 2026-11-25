@@ -20,6 +20,29 @@ public sealed class Settings
     /// <summary>Per mode (silent, balanced, performance, turbo): use the custom curve instead of the mode's fan profile.</summary>
     [DataMember] public bool[] CustomCurve = new bool[4];
 
+    /// <summary>Fans fully off below this temperature when the custom curve is in use (0 = never off).
+    /// Verified 2026-11-26: the EC stops at 0% and restarts within ~1 s of crossing; it keeps running until ~6 °C cooler.</summary>
+    [DataMember] public int FanOffBelow = 0;
+    public const int SpinUpPercent = 35;
+
+    /// <summary>The curve actually written to the EC: the user's curve with the fan-off zone applied.
+    /// Points below the threshold go to 0%; the highest of them moves to the threshold so spin-up happens exactly there.</summary>
+    public System.Collections.Generic.List<(int temp, int percent)> EffectiveCurve()
+    {
+        var c = new System.Collections.Generic.List<(int temp, int percent)>();
+        for (int i = 0; i < CurveTemps.Length && i < CurvePercents.Length; i++) c.Add((CurveTemps[i], CurvePercents[i]));
+        int x = FanOffBelow;
+        if (x <= 0 || c.Count == 0) return c;
+        int last = -1;
+        for (int i = 0; i < c.Count; i++) if (c[i].temp < x) { last = i; c[i] = (c[i].temp, 0); }
+        if (last >= 1 && (last + 1 >= c.Count || c[last + 1].temp > x))
+            c[last] = (x, CurvePercents[last + 1 < c.Count ? last + 1 : last]);
+        // spinning up from a standstill was verified at 35%: the first running point gets at least that
+        for (int i = 0; i < c.Count; i++)
+            if (c[i].percent > 0 || c[i].temp >= x) { if (c[i].percent < SpinUpPercent) c[i] = (c[i].temp, SpinUpPercent); }
+        return c;
+    }
+
     public bool UsesCurve(int modeIndex) => CustomCurve != null && modeIndex < CustomCurve.Length && CustomCurve[modeIndex];
 
     // Display

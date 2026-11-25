@@ -61,7 +61,14 @@ public sealed class Controller : IDisposable
     /// <summary>The fan setting a mode really uses: its own profile, or the custom curve if switched on for it.</summary>
     public FanMode FanFor(Mode m) => Settings.UsesCurve(m.Index) ? FanMode.Custom : m.Fan;
 
-    private System.Collections.Generic.List<(int, int)> CurveList => Settings.CurveTemps.Zip(Settings.CurvePercents, (t, p) => (t, p)).ToList();
+    private System.Collections.Generic.List<(int, int)> CurveList => Settings.EffectiveCurve().Select(p => (p.temp, p.percent)).ToList();
+
+    public void SetFanOffBelow(int celsius)
+    {
+        Settings.FanOffBelow = celsius; Settings.Save(); StateChanged?.Invoke();
+        var curve = CurveList;
+        Enqueue(() => { Fans.WriteCurve(curve); Log.Write($"Fan-off zone below {celsius} °C (0 = none)"); LogFans(); });
+    }
 
     public void SetCustomCurve(bool on)
     {
