@@ -85,6 +85,18 @@ public sealed class MainViewModel : Observable
         Raise(nameof(BatteryPercentText));
     }
 
+    /// <summary>Re-read values that can change outside the app (Fn keys): brightness, keyboard level.</summary>
+    public void RefreshFromHardware()
+    {
+        int b = Panel.GetBrightness();
+        if (b >= 0 && !_brightDebounce.IsEnabled) { _brightness = b; Raise(nameof(Brightness)); }
+        if (Controller.KeyboardLevel >= 0 && !_kbDebounce.IsEnabled)
+        {
+            _kb = Controller.KeyboardLevel;
+            Raise(nameof(Keyboard)); Raise(nameof(KeyboardText)); Raise(nameof(KeyGlow));
+        }
+    }
+
     private void OnState()
     {
         foreach (var m in ModeItems) m.Refresh();

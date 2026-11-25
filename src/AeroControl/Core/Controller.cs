@@ -87,6 +87,14 @@ public sealed class Controller : IDisposable
 
     public void SetBrightness(int percent) => Enqueue(() => Panel.SetBrightness(percent));
 
+    /// <summary>Read the keyboard backlight on the worker (after the keyboard changed it itself) and report back.</summary>
+    public void ReadKeyboard(Action<int> done) => Enqueue(() =>
+    {
+        int lvl = _kb?.GetBrightness() ?? -1;
+        if (lvl >= 0) KeyboardLevel = lvl;
+        done(lvl);
+    });
+
     public void SetWhitePoint(int kelvin)
     {
         Settings.WhitePoint = kelvin; Settings.Save(); StateChanged?.Invoke();

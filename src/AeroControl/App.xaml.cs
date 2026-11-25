@@ -19,6 +19,7 @@ public partial class App : Application
     private MainWindow _main;
     private PopoverWindow _popover;
     private TrayIcon _tray;
+    private FnKeys _fnKeys;
 
     public App()
     {
@@ -55,6 +56,8 @@ public partial class App : Application
         _main = new MainWindow(_vm);
         _popover = new PopoverWindow(_vm, page => _main.ShowAndActivate(page));
         _tray = new TrayIcon(() => _popover.Toggle(), () => _main.ShowAndActivate(), Quit);
+        try { _fnKeys = new FnKeys(_controller, Dispatcher, () => _vm.RefreshFromHardware()); }
+        catch (Exception ex) { Log.Write("FnKeys init failed: " + ex); }
 
         var t = new Thread(() => { while (_showSignal.WaitOne()) Dispatcher.BeginInvoke(new Action(() => _main.ShowAndActivate())); })
         { IsBackground = true };
@@ -101,6 +104,7 @@ public partial class App : Application
 
     private void Quit()
     {
+        _fnKeys?.Dispose();
         _tray?.Dispose();
         _controller?.Dispose();
         Shutdown(0);
