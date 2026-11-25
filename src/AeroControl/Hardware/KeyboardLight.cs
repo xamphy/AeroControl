@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Runtime.InteropServices;
 using Microsoft.Win32.SafeHandles;
 
@@ -67,6 +67,13 @@ public sealed class KeyboardLight : IDisposable
     {
         percent = Math.Max(0, Math.Min(100, percent));
         var p = Packet(0x08, 0, 0, 0, (byte)(percent / 2), 0, 0);
+        return Hid.HidD_SetFeature(_h, p, p.Length);
+    }
+
+    /// <summary>Keyboard-side "turn off after one minute without typing" (command 0x0A).</summary>
+    public bool SetAutoOff(bool on)
+    {
+        var p = Packet(0x0A, (byte)(on ? 1 : 0));
         return Hid.HidD_SetFeature(_h, p, p.Length);
     }
 
