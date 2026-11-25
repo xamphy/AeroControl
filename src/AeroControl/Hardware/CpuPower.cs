@@ -66,6 +66,23 @@ public static class CpuPower
         }
     }
 
+    [DllImport("YccDrvv3.dll")] private static extern uint ReadMSR(uint idx, out ulong data);
+
+    /// <summary>Read PL1/PL2 back from MSR 0x610 (MSR_PKG_POWER_LIMIT), read-only, for verification.</summary>
+    public static string ReadLimits()
+    {
+        try
+        {
+            Init();
+            ReadMSR(0x606, out var unit);              // MSR_RAPL_POWER_UNIT
+            double w = Math.Pow(0.5, unit & 0xF);
+            ReadMSR(0x610, out var pl);
+            double pl1 = (pl & 0x7FFF) * w, pl2 = ((pl >> 32) & 0x7FFF) * w;
+            return $"{pl1:0}/{pl2:0} W";
+        }
+        catch (Exception ex) { return "? (" + ex.GetType().Name + ")"; }
+    }
+
     public static string Model()
     {
         foreach (System.Management.ManagementObject o in new System.Management.ManagementObjectSearcher("SELECT Model FROM Win32_ComputerSystem").Get())

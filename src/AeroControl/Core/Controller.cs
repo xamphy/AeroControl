@@ -69,7 +69,11 @@ public sealed class Controller : IDisposable
     public void SetCharge(ChargeLimit l)
     {
         Settings.Charge = l; Settings.Save(); StateChanged?.Invoke();
-        Enqueue(() => { Battery.SetLimit(l); GccSync.WriteCharge(l); });
+        Enqueue(() =>
+        {
+            Battery.SetLimit(l); GccSync.WriteCharge(l);
+            Log.Write($"  readback: charge={Battery.ReadLimit()?.ToString() ?? "?"} stop={(GbWmi.TryGet("GetChargeStop", out var s) ? s : -1)}");
+        });
     }
 
     public void SetKeyboard(int percent, bool remember = true)
@@ -129,6 +133,8 @@ public sealed class Controller : IDisposable
             _kb.SetBrightness(lvl);
             KeyboardLevel = lvl;
         }
+        // Read back what the hardware now reports, for verification
+        Log.Write($"  readback: fans={Fans.ReadMode()?.ToString() ?? "?"} windows={WindowsPowerMode.Get()} kb={_kb?.GetBrightness()?.ToString() ?? "?"} pl={CpuPower.ReadLimits()}");
         StateChanged?.Invoke();
     }
 
