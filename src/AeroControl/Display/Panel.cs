@@ -92,6 +92,69 @@ public static class Panel
         return r == 0;
     }
 
+    public static (int w, int h) CurrentResolution
+    {
+        get
+        {
+            var dm = NewDevMode();
+            return EnumDisplaySettings(DeviceName, ENUM_CURRENT_SETTINGS, ref dm) ? (dm.dmPelsWidth, dm.dmPelsHeight) : (0, 0);
+        }
+    }
+
+    /// <summary>All (width, height) pairs the panel offers, largest first.</summary>
+    public static IReadOnlyList<(int w, int h)> AvailableResolutions
+    {
+        get
+        {
+            string dev = DeviceName;
+            var set = new HashSet<(int, int)>();
+            var dm = NewDevMode();
+            for (int i = 0; EnumDisplaySettings(dev, i, ref dm); i++)
+                if (dm.dmBitsPerPel == 32) set.Add((dm.dmPelsWidth, dm.dmPelsHeight));
+            return set.OrderByDescending(r => r.Item1 * r.Item2).ToList();
+        }
+    }
+
+    /// <summary>
+    /// Switch resolution and refresh rate together in one mode change (one blank instead of two).
+    /// Not something GCC does; it backs our optional "lower resolution on battery" setting.
+    /// </summary>
+    public static bool SetMode(int width, int height, int hz)
+    {
+        string dev = DeviceName;
+        var dm = NewDevMode();
+        if (!EnumDisplaySettings(dev, ENUM_CURRENT_SETTINGS, ref dm)) return false;
+        if (dm.dmPelsWidth == width && dm.dmPelsHeight == height && dm.dmDisplayFrequency == hz) return true;
+        dm.dmPelsWidth = width;
+        dm.dmPelsHeight = height;
+        dm.dmDisplayFrequency = hz;
+        dm.dmFields = DM_PELSWIDTH | DM_PELSHEIGHT | DM_DISPLAYFREQUENCY;
+        int test = ChangeDisplaySettingsEx(dev, ref dm, IntPtr.Zero, CDS_TEST, IntPtr.Zero);
+        if (test != 0) { Log.Write($"Panel.SetMode({width}x{height}@{hz}) rejected by driver ({test})"); return false; }
+        int r = ChangeDisplaySettingsEx(dev, ref dm, IntPtr.Zero, CDS_UPDATEREGISTRY, IntPtr.Zero);
+        Log.Write($"Panel.SetMode({width}x{height}@{hz}) on {dev} -> {r}");
+        return r == 0;
+    }
+
+    /// <summary>
+    /// Power-source display profile. AC: native resolution at the highest rate.
+    /// Battery: lowest rate, and optionally a lower resolution (e.g. 1920x1200).
+    /// </summary>
+    public static void ApplyPowerProfile(bool onAc, bool autoRefresh, (int w, int h)? batteryResolution)
+    {
+        var res = AvailableResolutions;
+        if (res.Count == 0) return;
+        var native = res[0];
+        var target = onAc || batteryResolution == null ? native : batteryResolution.Value;
+        int hz = CurrentRefreshRate;
+        if (autoRefresh)
+        {
+            var rates = AvailableRefreshRates;
+            if (rates.Count > 0) hz = onAc ? rates.First() : rates.Last();
+        }
+        SetMode(target.w, target.h, hz);
+    }
+
     /// <summary>GCC's "Auto Panel Refresh Rate": highest rate on AC, lowest on battery.</summary>
     public static void ApplyAutoRefresh(bool onAc)
     {
@@ -132,6 +195,9 @@ public static class Panel
     private const int ENUM_CURRENT_SETTINGS = -1;
     private const int DM_DISPLAYFREQUENCY = 0x400000;
     private const int CDS_UPDATEREGISTRY = 0x01;
+    private const int CDS_TEST = 0x02;
+    private const int DM_PELSWIDTH = 0x80000;
+    private const int DM_PELSHEIGHT = 0x100000;
 
     private static DEVMODE NewDevMode() => new() { dmSize = (short)Marshal.SizeOf<DEVMODE>() };
 
