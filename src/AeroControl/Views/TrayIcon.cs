@@ -23,25 +23,13 @@ public sealed class TrayIcon : IDisposable
 
     public void SetTooltip(string s) => _icon.Text = s.Length > 63 ? s.Substring(0, 63) : s;
 
-    /// <summary>A small white gauge on transparent, like a system tray glyph.</summary>
+    /// <summary>The app icon at the tray's small-icon size (it carries 16/20/24/32 px frames).</summary>
     private static System.Drawing.Icon Draw()
     {
-        int sz = SystemInformation.SmallIconSize.Width;
-        using var bmp = new Bitmap(sz, sz);
-        using (var g = Graphics.FromImage(bmp))
-        {
-            g.SmoothingMode = SmoothingMode.AntiAlias;
-            float s = sz / 24f;
-            using var pen = new Pen(Color.White, 2.2f * s) { StartCap = LineCap.Round, EndCap = LineCap.Round };
-            g.DrawArc(pen, 3 * s, 5 * s, 18 * s, 18 * s, 160, 220);
-            g.DrawLine(pen, 12 * s, 14 * s, 16.5f * s, 9.5f * s);
-        }
-        IntPtr h = bmp.GetHicon();
-        var icon = (System.Drawing.Icon)System.Drawing.Icon.FromHandle(h).Clone();
-        DestroyIcon(h);
-        return icon;
+        var res = System.Windows.Application.GetResourceStream(new Uri("pack://application:,,,/Assets/AeroControl.ico"));
+        using var s = res.Stream;
+        return new System.Drawing.Icon(s, SystemInformation.SmallIconSize);
     }
-
     [DllImport("user32.dll")] private static extern bool DestroyIcon(IntPtr h);
 
     public void Dispose() { _icon.Visible = false; _icon.Dispose(); }

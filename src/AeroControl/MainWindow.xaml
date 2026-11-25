@@ -2,7 +2,7 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:v="clr-namespace:AeroControl.Views"
-        Title="Aero Control" Width="1120" Height="760" MinWidth="900" MinHeight="600"
+        Title="Aero Control" Icon="Assets/AeroControl.ico" Width="1120" Height="760" MinWidth="900" MinHeight="600"
         WindowStartupLocation="CenterScreen" WindowStyle="None" ResizeMode="CanResize"
         Background="{DynamicResource Bg}" FontFamily="{StaticResource UiFont}"
         UseLayoutRounding="True" SnapsToDevicePixels="True">

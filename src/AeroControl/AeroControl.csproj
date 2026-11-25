@@ -9,6 +9,7 @@
     <Nullable>disable</Nullable>
     <PlatformTarget>x64</PlatformTarget>
     <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationIcon>Assets\AeroControl.ico</ApplicationIcon>
     <AssemblyName>AeroControl</AssemblyName>
     <RootNamespace>AeroControl</RootNamespace>
     <Version>0.1.0</Version>
@@ -21,6 +22,12 @@
     <Reference Include="System.Windows.Forms" />
     <Reference Include="System.Drawing" />
     <Reference Include="System.Runtime.Serialization" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- regenerate with tools\make-icon.ps1 -->
+    <Resource Include="Assets\AeroControl.ico" />
+    <None Remove="Assets\icon-preview.png" />
   </ItemGroup>
 
 </Project>
