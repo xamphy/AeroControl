@@ -159,10 +159,12 @@ public partial class App : Application
             var rtb = new System.Windows.Media.Imaging.RenderTargetBitmap(
                 (int)(fw * dpi.DpiScaleX), (int)(fh * dpi.DpiScaleY), dpi.PixelsPerInchX, dpi.PixelsPerInchY,
                 System.Windows.Media.PixelFormats.Pbgra32);
-            var bg = new System.Windows.Media.DrawingVisual();
-            using (var dc = bg.RenderOpen())
-                dc.DrawRectangle(w.Background is System.Windows.Media.SolidColorBrush b && b.Color.A > 0 ? b : System.Windows.Media.Brushes.Black, null, new Rect(0, 0, fw, fh));
-            rtb.Render(bg);
+            if (w.Background is System.Windows.Media.SolidColorBrush b && b.Color.A > 0) // transparent windows stay transparent
+            {
+                var bg = new System.Windows.Media.DrawingVisual();
+                using (var dc = bg.RenderOpen()) dc.DrawRectangle(b, null, new Rect(0, 0, fw, fh));
+                rtb.Render(bg);
+            }
             rtb.Render(root);
             var enc = new System.Windows.Media.Imaging.PngBitmapEncoder();
             enc.Frames.Add(System.Windows.Media.Imaging.BitmapFrame.Create(rtb));

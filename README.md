@@ -5,6 +5,8 @@ WPF on .NET Framework 4.8, runs elevated, lives in the tray.
 
 <p align="center"><img src="src/AeroControl/Assets/icon-preview.png" width="96" alt="Aero Control icon"></p>
 
+<p align="center"><img src="docs/screenshots/home.png" width="820" alt="Home"></p>
+
 ## Features
 
 - **Power modes**: Silent / Balanced / Performance / Turbo: fans, CPU power limits, Windows power mode and keyboard backlight per mode, separate modes on AC and battery with automatic switching
@@ -14,6 +16,20 @@ WPF on .NET Framework 4.8, runs elevated, lives in the tray.
 - **Keyboard**: white backlight level, per-mode levels, auto-off
 - **Fn keys** with macOS-style popups in the top-right corner: mode cycle (Fn+Esc), brightness, keyboard light, touchpad, microphone, and volume (replaces the Windows volume flyout)
 - Custom fan curve editor
+
+## Screenshots
+
+| Tray popover | Fn-key popup |
+|---|---|
+| <img src="docs/screenshots/popover.png" width="300" alt="Tray popover"> | <img src="docs/screenshots/osd-level.png" width="380" alt="Volume popup"> |
+
+| Performance | Display |
+|---|---|
+| <img src="docs/screenshots/perf.png" alt="Performance page"> | <img src="docs/screenshots/display.png" alt="Display page"> |
+
+| Battery | Keyboard |
+|---|---|
+| <img src="docs/screenshots/battery.png" alt="Battery page"> | <img src="docs/screenshots/keyboard.png" alt="Keyboard page"> |
 
 ## Requirements
 
