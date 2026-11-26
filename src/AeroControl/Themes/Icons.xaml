@@ -16,6 +16,9 @@
     <sys:String x:Key="IcoWarm">M12 3a6 6 0 0 0-4 10.5V17h8v-3.5A6 6 0 0 0 12 3zM9 21h6</sys:String>
     <sys:String x:Key="IcoSearch">M11 4a7 7 0 1 0 0 14 7 7 0 1 0 0-14zM20 20l-3.5-3.5</sys:String>
 
+    <!-- The app logo (open "A" with a foot), filled; same outline as tools/make-icon.ps1 -->
+    <Geometry x:Key="LogoPath">M3.25,87.5 L40,14 Q42.5,9 45,14 L77.5,79 L77.5,87.5 L49.5,87.5 L49.5,76.5 L65.25,76.5 L42.5,31 L14.25,87.5 Z</Geometry>
+
     <!-- An icon is a Path inside a 24x24 canvas, scaled by a Viewbox -->
     <Style x:Key="IconPath" TargetType="Path">
         <Setter Property="StrokeThickness" Value="2" />
