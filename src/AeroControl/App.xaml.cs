@@ -20,6 +20,7 @@ public partial class App : Application
     private MainWindow _main;
     private PopoverWindow _popover;
     private TrayIcon _tray;
+    private string _lastTray;
     private FnKeys _fnKeys;
 
     public App()
@@ -51,6 +52,16 @@ public partial class App : Application
         if (args.Contains("--kbtest")) { Shutdown(KbTest()); return; }
         if (args.Contains("--kbsweep")) { Shutdown(KbSweep(8000)); return; }
         if (args.Contains("--curvetest")) { Shutdown(CurveTest()); return; }
+        if (args.Contains("--hibtest"))
+        {
+            int before = Hardware.Hibernate.BatterySeconds;
+            Hardware.Hibernate.BatterySeconds = 3600;
+            int mid = Hardware.Hibernate.BatterySeconds;
+            Hardware.Hibernate.BatterySeconds = before;
+            int after = Hardware.Hibernate.BatterySeconds;
+            Log.Write($"HIBTEST before={before} set3600->{mid} restored->{after} {(mid == 3600 && after == before ? "PASS" : "FAIL")}");
+            Shutdown(mid == 3600 && after == before ? 0 : 1); return;
+        }
 
         // ---- single instance: a second launch just shows the running one ----
         // (--shot renders alongside a running instance and never touches the keyboard or Fn keys)
@@ -68,6 +79,8 @@ public partial class App : Application
         _main = new MainWindow(_vm);
         _popover = new PopoverWindow(_vm, page => _main.ShowAndActivate(page));
         _tray = new TrayIcon(() => _popover.Toggle(), () => _main.ShowAndActivate(), Quit);
+        _controller.LiveUpdated += () => Dispatcher.BeginInvoke(new Action(UpdateTrayText));
+        _controller.StateChanged += () => Dispatcher.BeginInvoke(new Action(UpdateTrayText));
         if (!ShotMode) try { _fnKeys = new FnKeys(_controller, Dispatcher, () => _vm.RefreshFromHardware()); }
         catch (Exception ex) { Log.Write("FnKeys init failed: " + ex); }
 
@@ -261,6 +274,22 @@ public partial class App : Application
             using var fs = File.Create(file);
             enc.Save(fs);
         }
+    }
+
+    /// <summary>Tray hover text (Windows allows 63 characters): mode and fans, then temperatures and battery.</summary>
+    private void UpdateTrayText()
+    {
+        if (_tray == null) return;
+        var l = _controller.Live;
+        string fans = l.Fan1Pct >= 0 ? $" · fans {l.Fan1Pct}%" : "";
+        string temps = l.CpuTemp >= 0 ? $"CPU {l.CpuTemp}° GPU {(l.GpuTemp > 0 ? l.GpuTemp + "°" : "–")}" : "";
+        string batt = l.BatteryPercent >= 0 ? $"{l.BatteryPercent}%" : "";
+        if (_vm.TimeLeft is TimeSpan t && !_controller.OnAc) batt += $" ({MainViewModel.Span(t)})";
+        else if (_controller.OnAc && batt != "") batt += " ⚡";
+        string text = $"{_controller.CurrentMode.Name}{fans}\n{temps} · {batt}".Trim();
+        if (_lastTray == null) Log.Write($"Tray text ({text.Length} chars): {text.Replace("\n", " | ")}");
+        _lastTray = text;
+        _tray.SetTooltip(text);
     }
 
     /// <summary>Render every page of the main window and the popover to PNGs (read-only; for design review).</summary>

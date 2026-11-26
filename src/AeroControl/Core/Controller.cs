@@ -23,6 +23,14 @@ public sealed class Controller : IDisposable
     public int BatteryDesignMwh { get; private set; } = -1;
     public int BatteryFullMwh { get; private set; } = -1;
     public int? BatteryRateMw { get; private set; }
+    public int BatteryRemainingMwh { get; private set; } = -1;
+    public int HibernateSeconds { get; private set; } = -1;
+
+    public void SetHibernate(int seconds)
+    {
+        HibernateSeconds = seconds; StateChanged?.Invoke();
+        Enqueue(() => { Hibernate.BatterySeconds = seconds; HibernateSeconds = Hibernate.BatterySeconds; StateChanged?.Invoke(); });
+    }
     public int KeyboardLevel { get; private set; } = -1;
 
     public event Action LiveUpdated;
@@ -48,6 +56,7 @@ public sealed class Controller : IDisposable
         {
             BatteryHealthy = Battery.HealthNormal;
             (BatteryDesignMwh, BatteryFullMwh) = Battery.Capacity();
+            HibernateSeconds = Hibernate.BatterySeconds;
             Log.Write($"Battery capacity: design {BatteryDesignMwh} mWh, full {BatteryFullMwh} mWh");
             if (!App.ShotMode) try { _kb = KeyboardLight.Open(); KeyboardLevel = _kb?.GetBrightness() ?? -1; } catch { }
             if (Battery.ReadLimit() is ChargeLimit l) Settings.Charge = l;
@@ -207,7 +216,7 @@ public sealed class Controller : IDisposable
     private void Poll()
     {
         Live = Sensors.Read();
-        BatteryRateMw = Battery.RateMilliwatts();
+        (BatteryRateMw, BatteryRemainingMwh) = Battery.Status();
         LiveUpdated?.Invoke();
     }
 

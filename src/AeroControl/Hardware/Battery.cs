@@ -33,21 +33,32 @@ public static class Battery
         return (design, full);
     }
 
-    /// <summary>Charge (+) or discharge (-) rate in mW, 0 when idle, null when unknown.</summary>
-    public static int? RateMilliwatts()
+    /// <summary>Charge (+) or discharge (-) rate in mW (0 idle, null unknown) and the charge left in mWh (-1 unknown).</summary>
+    public static (int? rateMw, int remainingMwh) Status()
     {
         try
         {
-            using var q = new ManagementObjectSearcher(@"root\wmi", "SELECT ChargeRate, DischargeRate, Charging, Discharging FROM BatteryStatus");
+            using var q = new ManagementObjectSearcher(@"root\wmi", "SELECT ChargeRate, DischargeRate, Charging, Discharging, RemainingCapacity FROM BatteryStatus");
             foreach (ManagementObject o in q.Get())
             {
-                if (o["Charging"] is bool c && c) return Convert.ToInt32(o["ChargeRate"]);
-                if (o["Discharging"] is bool d && d) return -Convert.ToInt32(o["DischargeRate"]);
-                return 0;
+                int rem = o["RemainingCapacity"] is null ? -1 : Convert.ToInt32(o["RemainingCapacity"]);
+                if (o["Charging"] is bool c && c) return (Convert.ToInt32(o["ChargeRate"]), rem);
+                if (o["Discharging"] is bool d && d) return (-Convert.ToInt32(o["DischargeRate"]), rem);
+                return (0, rem);
             }
         }
         catch { }
-        return null;
+        return (null, -1);
+    }
+
+    /// <summary>Windows' own estimate of battery time left (smoothed), null when not on battery or unknown.</summary>
+    public static TimeSpan? WindowsTimeLeft
+    {
+        get
+        {
+            int s = System.Windows.Forms.SystemInformation.PowerStatus.BatteryLifeRemaining;
+            return s > 0 ? TimeSpan.FromSeconds(s) : (TimeSpan?)null;
+        }
     }
 
     private static int ReadWmi(string cls, string prop)

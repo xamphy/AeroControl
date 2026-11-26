@@ -91,7 +91,7 @@ public sealed class MainViewModel : Observable
         Raise(nameof(Fan1Duty)); Raise(nameof(Fan2Duty)); Raise(nameof(Fan1PctText)); Raise(nameof(Fan2PctText)); Raise(nameof(CpuPct)); Raise(nameof(GpuPct));
         Raise(nameof(Fan1Pct)); Raise(nameof(Fan2Pct)); Raise(nameof(BatteryText)); Raise(nameof(PowerSource));
         Raise(nameof(BatteryPercentText)); Raise(nameof(CpuHeat)); Raise(nameof(GpuHeat)); Raise(nameof(CpuTempValue));
-        Raise(nameof(BatteryRateText));
+        Raise(nameof(BatteryRateText)); Raise(nameof(TimeLeftText)); Raise(nameof(TimeLeftLabel)); Raise(nameof(HasTimeLeft));
         Raise(nameof(CpuLoadText)); Raise(nameof(GpuLoadText)); Raise(nameof(RamText)); Raise(nameof(RamDetail));
         Raise(nameof(CpuLoadPct)); Raise(nameof(GpuLoadPct)); Raise(nameof(RamPct));
     }
@@ -195,6 +195,39 @@ public sealed class MainViewModel : Observable
     public double CapacityPct => HasCapacity ? Math.Min(1.0, (double)Controller.BatteryFullMwh / Controller.BatteryDesignMwh) : 0;
     public string CapacityPctText => HasCapacity ? $"{Math.Min(100, Math.Round(100.0 * Controller.BatteryFullMwh / Controller.BatteryDesignMwh)):0}%" : "–";
     public string WearText => HasCapacity ? $"{Math.Max(0, Math.Round(100 - 100.0 * Controller.BatteryFullMwh / Controller.BatteryDesignMwh)):0}%" : "–";
+    /// <summary>On battery: Windows' smoothed estimate (or charge left / draw). Charging: time until the charge limit.</summary>
+    public TimeSpan? TimeLeft
+    {
+        get
+        {
+            int? rate = Controller.BatteryRateMw; int rem = Controller.BatteryRemainingMwh;
+            if (!Controller.OnAc)
+                return Battery.WindowsTimeLeft ?? (rate < 0 && rem > 0 ? TimeSpan.FromHours(rem / (double)-rate) : (TimeSpan?)null);
+            if (rate > 0 && rem >= 0 && Controller.BatteryFullMwh > 0)
+            {
+                double target = Controller.BatteryFullMwh * Battery.StopPercent(Controller.Settings.Charge) / 100.0;
+                if (target > rem) return TimeSpan.FromHours((target - rem) / rate.Value);
+            }
+            return null;
+        }
+    }
+    public bool HasTimeLeft => TimeLeft != null;
+    public string TimeLeftLabel => Controller.OnAc ? (Controller.Settings.Charge == ChargeLimit.Full ? "Until full" : $"Until {Battery.StopPercent(Controller.Settings.Charge)}%") : "Time left";
+    public string TimeLeftText => TimeLeft is TimeSpan t ? Span(t) : "–";
+    public static string Span(TimeSpan t) => t.TotalMinutes < 1 ? "under a minute" : t.TotalHours < 1 ? $"{(int)t.TotalMinutes} min" : $"{(int)t.TotalHours} h {t.Minutes:00} min";
+
+    public bool Hib15 { get => Controller.HibernateSeconds == 900; set { if (value) Controller.SetHibernate(900); } }
+    public bool Hib60 { get => Controller.HibernateSeconds == 3600; set { if (value) Controller.SetHibernate(3600); } }
+    public bool Hib180 { get => Controller.HibernateSeconds == 10800; set { if (value) Controller.SetHibernate(10800); } }
+    public bool HibNever { get => Controller.HibernateSeconds == 0; set { if (value) Controller.SetHibernate(0); } }
+    public string HibernateHint => Controller.HibernateSeconds switch
+    {
+        < 0 => "Could not read the power plan",
+        0 => "Stays in sleep until the battery runs out",
+        var s when s != 900 && s != 3600 && s != 10800 => $"Currently after {Span(TimeSpan.FromSeconds(s))}",
+        _ => "Sleep keeps draining the battery; hibernate saves to disk and uses none",
+    };
+
     public string BatteryRateText => Controller.BatteryRateMw switch
     {
         null => "–",

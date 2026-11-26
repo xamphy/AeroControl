@@ -56,6 +56,13 @@ home/perf/keyboard/battery/popover/Fn popup per step (full page height) and writ
 `%LOCALAPPDATA%\AeroControl\sweeps\<yyyyMMdd-HHmm>`. First run 2026-11-26 03:28: all readbacks matched, no HID trips
 (Turbo 7,927/8,167 rpm at 100%). Note: user is often on an external 1920x1080@60 monitor; that is not a bug.
 
+Also 2026-11-26 (03:45): Home "Usage" card (CPU/GPU/RAM via Task Manager's perf counters, `Hardware/Usage.cs`;
+dGPU found once by DXGI LUID; never wakes the RTX). Battery page: "Time left" / "Until 60%" row (Windows estimate on
+battery, computed from RemainingCapacity and charge rate when charging; hidden when held at the limit; not yet seen
+on battery) and Sleep: "Hibernate after sleeping on battery" 15 min/1 h/3 h/Never (`Hardware/Hibernate.cs`,
+active plan's DC HIBERNATEIDLE; GCC had set 900 s; `--hibtest` round-trip PASS). Tray hover text: mode, fans,
+temps, battery (logged once at start). `tools/sweep-sheet.py <sweep dir>` merges a sweep into sweep-sheet.png.
+
 ## What works (verified on hardware, GCC closed)
 
 | Area | Notes |

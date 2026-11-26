@@ -288,6 +288,26 @@
                                 <Border Style="{StaticResource Row}" MinHeight="44" Visibility="{Binding HasCapacity, Converter={StaticResource Vis}}"><DockPanel><TextBlock Text="Wear" VerticalAlignment="Center" /><TextBlock Text="{Binding WearText}" Foreground="{DynamicResource Sub}" HorizontalAlignment="Right" VerticalAlignment="Center" /></DockPanel></Border>
                                 <Border Style="{StaticResource Row}" MinHeight="44"><DockPanel><TextBlock Text="Status" VerticalAlignment="Center" /><TextBlock Text="{Binding BatteryText}" Foreground="{DynamicResource Sub}" HorizontalAlignment="Right" VerticalAlignment="Center" /></DockPanel></Border>
                                 <Border Style="{StaticResource Row}" MinHeight="44"><DockPanel><TextBlock Text="Power" VerticalAlignment="Center" /><TextBlock Text="{Binding BatteryRateText}" Foreground="{DynamicResource Sub}" HorizontalAlignment="Right" VerticalAlignment="Center" /></DockPanel></Border>
+                                <Border Style="{StaticResource Row}" MinHeight="44" Visibility="{Binding HasTimeLeft, Converter={StaticResource Vis}}"><DockPanel><TextBlock Text="{Binding TimeLeftLabel}" VerticalAlignment="Center" /><TextBlock Text="{Binding TimeLeftText}" Foreground="{DynamicResource Sub}" HorizontalAlignment="Right" VerticalAlignment="Center" /></DockPanel></Border>
+                            </StackPanel>
+                        </Border>
+
+                        <TextBlock Text="Sleep" Style="{StaticResource SectionTitle}" Margin="4,22,0,8" />
+                        <Border Style="{StaticResource CardBox}">
+                            <StackPanel>
+                            <Border Style="{StaticResource FirstRow}" Padding="16,14">
+                            <DockPanel>
+                                <Border DockPanel.Dock="Right" Background="{DynamicResource Field}" CornerRadius="8" Padding="2" VerticalAlignment="Center">
+                                    <StackPanel Orientation="Horizontal">
+                                        <RadioButton GroupName="hib" Style="{StaticResource Segment}" Content="15 min" IsChecked="{Binding Hib15}" />
+                                        <RadioButton GroupName="hib" Style="{StaticResource Segment}" Content="1 h" IsChecked="{Binding Hib60}" />
+                                        <RadioButton GroupName="hib" Style="{StaticResource Segment}" Content="3 h" IsChecked="{Binding Hib180}" />
+                                        <RadioButton GroupName="hib" Style="{StaticResource Segment}" Content="Never" IsChecked="{Binding HibNever}" />
+                                    </StackPanel>
+                                </Border>
+                                <StackPanel VerticalAlignment="Center" Margin="0,0,12,0"><TextBlock Text="Hibernate after sleeping on battery" /><TextBlock Text="{Binding HibernateHint}" Style="{StaticResource SubText}" Margin="0,3,0,0" /></StackPanel>
+                            </DockPanel>
+                            </Border>
                             </StackPanel>
                         </Border>
                     </StackPanel>
