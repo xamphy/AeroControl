@@ -13,6 +13,9 @@ namespace AeroControl;
 public partial class App : Application
 {
     public static bool ShotMode { get; private set; }
+    /// <summary>--scale N: render screenshots at N× regardless of the monitor's DPI (README shots at 2×).</summary>
+    private static double ShotScale;
+    private static DpiScale ShotDpi(System.Windows.Media.Visual v) => ShotScale > 0 ? new DpiScale(ShotScale, ShotScale) : System.Windows.Media.VisualTreeHelper.GetDpi(v);
     private Mutex _single;
     private EventWaitHandle _showSignal;
     private Controller _controller;
@@ -66,6 +69,8 @@ public partial class App : Application
         // ---- single instance: a second launch just shows the running one ----
         // (--shot renders alongside a running instance and never touches the keyboard or Fn keys)
         ShotMode = args.Contains("--shot");
+        int sc = Array.IndexOf(args, "--scale");
+        if (sc >= 0 && sc + 1 < args.Length) double.TryParse(args[sc + 1], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out ShotScale);
         _single = new Mutex(!ShotMode, "AeroControl.Single", out bool first);
         _showSignal = new EventWaitHandle(false, EventResetMode.AutoReset, ShotMode ? null : "AeroControl.Show");
         if (!first && !ShotMode) { _showSignal.Set(); Shutdown(0); return; }
@@ -258,7 +263,7 @@ public partial class App : Application
         static void SaveVisual(FrameworkElement root, Window w, string file, System.Windows.Media.Brush background)
         {
             root.UpdateLayout();
-            var dpi = System.Windows.Media.VisualTreeHelper.GetDpi(w);
+            var dpi = ShotDpi(w);
             double fw = root.ActualWidth + root.Margin.Left + root.Margin.Right, fh = root.ActualHeight + root.Margin.Top + root.Margin.Bottom;
             var rtb = new System.Windows.Media.Imaging.RenderTargetBitmap((int)(fw * dpi.DpiScaleX), (int)(fh * dpi.DpiScaleY),
                 dpi.PixelsPerInchX, dpi.PixelsPerInchY, System.Windows.Media.PixelFormats.Pbgra32);
@@ -349,7 +354,7 @@ public partial class App : Application
             content.UpdateLayout();
             double fw = content.ActualWidth + content.Margin.Left + content.Margin.Right;
             double fh = content.ActualHeight + content.Margin.Top + content.Margin.Bottom;
-            var dpi = System.Windows.Media.VisualTreeHelper.GetDpi(_main);
+            var dpi = ShotDpi(_main);
             var rtb = new System.Windows.Media.Imaging.RenderTargetBitmap((int)(fw * dpi.DpiScaleX), (int)(fh * dpi.DpiScaleY),
                 dpi.PixelsPerInchX, dpi.PixelsPerInchY, System.Windows.Media.PixelFormats.Pbgra32);
             var bg = new System.Windows.Media.DrawingVisual();
@@ -379,7 +384,7 @@ public partial class App : Application
         {
             w.UpdateLayout();
             var root = (FrameworkElement)w.Content;
-            var dpi = System.Windows.Media.VisualTreeHelper.GetDpi(w);
+            var dpi = ShotDpi(w);
             double fw = root.ActualWidth + root.Margin.Left + root.Margin.Right, fh = root.ActualHeight + root.Margin.Top + root.Margin.Bottom;
             var rtb = new System.Windows.Media.Imaging.RenderTargetBitmap(
                 (int)(fw * dpi.DpiScaleX), (int)(fh * dpi.DpiScaleY), dpi.PixelsPerInchX, dpi.PixelsPerInchY,

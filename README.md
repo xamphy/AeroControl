@@ -9,13 +9,15 @@ WPF on .NET Framework 4.8, runs elevated, lives in the tray.
 
 ## Features
 
+- **Home**: CPU/GPU temperatures (amber/red when hot), fan speeds, and CPU/GPU/memory usage from Windows' own counters (reading them never wakes the RTX 4050)
 - **Power modes**: Silent / Balanced / Performance / Turbo: fans, CPU power limits, Windows power mode and keyboard backlight per mode, separate modes on AC and battery with automatic switching
 - **Display**: 90/60 Hz switching, optional lower resolution on battery, brightness, white point
-- **Battery**: charge limit (100 / 80 / 60 %)
+- **Battery**: charge limit (100 / 80 / 60 %), maximum capacity and wear, charge/discharge watts, time left or time to the limit, and how long the laptop sleeps on battery before it hibernates
 - **OLED care**: dark mode, taskbar auto-hide/transparency, pixel refresh, auto-dim when idle, pixel shift
 - **Keyboard**: white backlight level, per-mode levels, auto-off
 - **Fn keys** with macOS-style popups in the top-right corner: mode cycle (Fn+Esc), brightness, keyboard light, touchpad, microphone, and volume (replaces the Windows volume flyout)
-- Custom fan curve editor
+- **Custom fan curve** per mode, with a live dot for the current temperature (never below 20%)
+- **Tray**: a Control Center-style popover, and a hover text with mode, fan speed, temperatures and battery
 
 ## Screenshots
 
@@ -30,6 +32,10 @@ WPF on .NET Framework 4.8, runs elevated, lives in the tray.
 | Battery | Keyboard |
 |---|---|
 | <img src="docs/screenshots/battery.png" alt="Battery page"> | <img src="docs/screenshots/keyboard.png" alt="Keyboard page"> |
+
+| Custom fan curve |
+|---|
+| <img src="docs/screenshots/fan-curve.png" width="620" alt="Custom fan curve with the current temperature"> |
 
 ## Requirements
 
@@ -49,6 +55,12 @@ This builds a Release, installs it to `C:\Program Files\AeroControl`, registers 
 To stop GCC from starting as well: `schtasks /Change /TN GCC /DISABLE` (undo with `/ENABLE`).
 
 Settings and a log of every hardware write are in `%LOCALAPPDATA%\AeroControl`.
+
+### Diagnostics
+
+- `AeroControl.exe --probe <file>`: read-only survey of firmware, keyboard and display
+- `AeroControl.exe --shot <dir> [--scale 2]`: render every page (dark and light) to PNG, read-only
+- `AeroControl.exe --sweep [dir]` (with the normal app closed): really switches each mode, keyboard level and charge limit, screenshots each step, logs what the hardware reports, then restores everything. `python tools\sweep-sheet.py <dir>` merges a sweep into one image
 
 ## Disclaimer
 
