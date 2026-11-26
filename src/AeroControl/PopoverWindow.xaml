@@ -61,7 +61,7 @@
                     <StackPanel>
                         <Border Width="30" Height="30" CornerRadius="15" Background="{DynamicResource Accent}" HorizontalAlignment="Left"><v:Icon Data="{StaticResource IcoFan}" Width="16" Height="16" /></Border>
                         <TextBlock Margin="0,8,0,0" FontWeight="SemiBold"><Run Text="Fans · " /><Run Text="{Binding FanText, Mode=OneWay}" /></TextBlock>
-                        <TextBlock FontSize="11" Foreground="{DynamicResource Sub}"><Run Text="{Binding Fan1, Mode=OneWay}" /><Run Text=" · " /><Run Text="{Binding Fan2, Mode=OneWay}" /><Run Text=" rpm" /></TextBlock>
+                        <TextBlock FontSize="11" Foreground="{DynamicResource Sub}"><Run Text="{Binding Fan1PctText, Mode=OneWay}" /><Run Text=" · " /><Run Text="{Binding Fan2PctText, Mode=OneWay}" /></TextBlock>
                     </StackPanel>
                 </Button>
                 <Button Style="{StaticResource TileButton}" Margin="5" Click="Charge_Click" AutomationProperties.Name="Charge limit, click to change">
@@ -100,7 +100,7 @@
             <UniformGrid Columns="4" Margin="4,10,4,2">
                 <StackPanel><TextBlock HorizontalAlignment="Center" FontSize="15" FontWeight="SemiBold"><Run Text="{Binding CpuTemp, Mode=OneWay}" />°</TextBlock><TextBlock Text="CPU" HorizontalAlignment="Center" FontSize="10" Foreground="{DynamicResource Sub}" /></StackPanel>
                 <StackPanel><TextBlock HorizontalAlignment="Center" FontSize="15" FontWeight="SemiBold"><Run Text="{Binding GpuTemp, Mode=OneWay}" />°</TextBlock><TextBlock Text="GPU" HorizontalAlignment="Center" FontSize="10" Foreground="{DynamicResource Sub}" /></StackPanel>
-                <StackPanel><TextBlock Text="{Binding Fan1}" HorizontalAlignment="Center" FontSize="15" FontWeight="SemiBold" /><TextBlock Text="FAN" HorizontalAlignment="Center" FontSize="10" Foreground="{DynamicResource Sub}" /></StackPanel>
+                <StackPanel><TextBlock Text="{Binding Fan1PctText}" HorizontalAlignment="Center" FontSize="15" FontWeight="SemiBold" /><TextBlock Text="FAN" HorizontalAlignment="Center" FontSize="10" Foreground="{DynamicResource Sub}" /></StackPanel>
                 <StackPanel><TextBlock Text="{Binding BatteryPercentText}" HorizontalAlignment="Center" FontSize="15" FontWeight="SemiBold" /><TextBlock Text="BATTERY" HorizontalAlignment="Center" FontSize="10" Foreground="{DynamicResource Sub}" /></StackPanel>
             </UniformGrid>
         </StackPanel>

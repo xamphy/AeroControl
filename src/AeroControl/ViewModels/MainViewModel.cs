@@ -88,7 +88,7 @@ public sealed class MainViewModel : Observable
     private void OnLive()
     {
         Raise(nameof(CpuTemp)); Raise(nameof(GpuTemp)); Raise(nameof(Fan1)); Raise(nameof(Fan2));
-        Raise(nameof(Fan1Duty)); Raise(nameof(Fan2Duty)); Raise(nameof(CpuPct)); Raise(nameof(GpuPct));
+        Raise(nameof(Fan1Duty)); Raise(nameof(Fan2Duty)); Raise(nameof(Fan1PctText)); Raise(nameof(Fan2PctText)); Raise(nameof(CpuPct)); Raise(nameof(GpuPct));
         Raise(nameof(Fan1Pct)); Raise(nameof(Fan2Pct)); Raise(nameof(BatteryText)); Raise(nameof(PowerSource));
         Raise(nameof(BatteryPercentText)); Raise(nameof(CpuHeat)); Raise(nameof(GpuHeat)); Raise(nameof(CpuTempValue));
         Raise(nameof(BatteryRateText));
@@ -133,6 +133,8 @@ public sealed class MainViewModel : Observable
     public string GpuTemp => L.GpuTemp > 0 ? L.GpuTemp.ToString() : "–";
     public string Fan1 => L.Fan1Rpm >= 0 ? L.Fan1Rpm.ToString("N0") : "–";
     public string Fan2 => L.Fan2Rpm >= 0 ? L.Fan2Rpm.ToString("N0") : "–";
+    public string Fan1PctText => L.Fan1Pct >= 0 ? $"{L.Fan1Pct}%" : "–";
+    public string Fan2PctText => L.Fan2Pct >= 0 ? $"{L.Fan2Pct}%" : "–";
     public string Fan1Duty => L.Fan1Pct >= 0 ? $"{L.Fan1Pct}% duty" : "";
     public string Fan2Duty => L.Fan2Pct >= 0 ? $"{L.Fan2Pct}% duty" : "";
     public double CpuPct => Math.Max(0, L.CpuTemp) / 100.0;
