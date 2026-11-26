@@ -46,6 +46,14 @@ running points to >= 35% (spin-up from standstill verified at 35%; lower unteste
 0% → 0 rpm at 43 °C idle; CPU load crossed 50 °C → fans restarted within ~1 s (35%, 2,557 rpm); EC has its own
 hysteresis (kept 35% down to ~44 °C, then stopped once; no flapping over 60 s). Editor shades the zone.
 
+Fan-off is a **custom-curve-only** feature (user decision; Silent keeps the EC's Eco profile — measured with
+`--ecoprofile`: 25% idle, 31% from ~55 °C, CPU never above 58 °C at Silent's 15 W).
+**GPU guard** (`Controller.GpuGuard/GuardNext`): only CPU heat was verified to restart the fans (no way to load the
+RTX 4050 without installing something; pip install was blocked). If the GPU reaches the threshold while both fans
+read 0 rpm, the app rewrites the curve without the off zone until GPU <= threshold-6 and CPU < threshold.
+Decision logic checked with `--guardtest` (8/8 PASS); the curve write itself is the tested path. Open: a real GPU-load
+test (e.g. a game in a custom-curve mode with fan-off on) — look for `GPU guard ON` in the log.
+
 ## What works (verified on hardware, GCC closed)
 
 | Area | Notes |

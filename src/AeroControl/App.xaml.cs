@@ -53,6 +53,8 @@ public partial class App : Application
         if (args.Contains("--kbsweep")) { Shutdown(KbSweep(8000)); return; }
         if (args.Contains("--curvetest")) { Shutdown(CurveTest()); return; }
         if (args.Contains("--fanofftest")) { Shutdown(FanOffTest()); return; }
+        if (args.Contains("--ecoprofile")) { Shutdown(EcoProfile()); return; }
+        if (args.Contains("--guardtest")) { Shutdown(GuardTest()); return; }
 
         // ---- single instance: a second launch just shows the running one ----
         // (--shot renders alongside a running instance and never touches the keyboard or Fn keys)
@@ -304,6 +306,58 @@ public partial class App : Application
             Log.Write($"FANOFF restored: fans={Hardware.Fans.ReadMode()} stopped={stopped} restarted={restarted} cooldown on/off changes={transitions} aborted={aborted}");
         }
         return stopped && restarted ? 0 : 1;
+    }
+
+    /// <summary>Measure the EC's Eco (Silent) fan profile: temperature vs duty while idle, under all-core load (to 80 °C or 150 s), and cooling down.</summary>
+    private static int EcoProfile()
+    {
+        var st = Core.Settings.Load();
+        var mode = Modes.ById(Hardware.Sensors.OnAc ? st.ModeAc : st.ModeDc);
+        var stop = new ManualResetEventSlim();
+        try
+        {
+            Hardware.Fans.Apply(Hardware.FanMode.Eco);
+            Log.Write($"ECO start: fans={Hardware.Fans.ReadMode()}");
+            void S(string ph, int i) { var s = Hardware.Sensors.Read(); Log.Write($"ECO {ph} t+{i}s: cpu {s.CpuTemp} gpu {s.GpuTemp} duty {s.Fan1Pct}/{s.Fan2Pct}% rpm {s.Fan1Rpm}/{s.Fan2Rpm}"); }
+            for (int i = 1; i <= 15; i++) { Thread.Sleep(1000); S("idle", i); }
+            for (int c = 0; c < Environment.ProcessorCount; c++)
+                new Thread(() => { double x = 1; while (!stop.IsSet) x = Math.Sqrt(x + 1.0001); }) { IsBackground = true, Priority = ThreadPriority.BelowNormal }.Start();
+            for (int i = 1; i <= 150; i++) { Thread.Sleep(1000); S("load", i); if (Hardware.Sensors.Read().CpuTemp >= 80) break; }
+            stop.Set();
+            for (int i = 1; i <= 45; i++) { Thread.Sleep(1000); S("cool", i); }
+        }
+        finally
+        {
+            stop.Set();
+            Hardware.Fans.Apply(st.UsesCurve(mode.Index) ? Hardware.FanMode.Custom : mode.Fan, st.FixedFanPercent, st.EffectiveCurve());
+            Log.Write($"ECO restored: fans={Hardware.Fans.ReadMode()}");
+        }
+        return 0;
+    }
+
+    /// <summary>GPU guard decisions on made-up readings (no hardware). Writes PASS/FAIL lines to the log; exit code = failures.</summary>
+    private static int GuardTest()
+    {
+        Hardware.SensorSnapshot S(int cpu, int gpu, int rpm) => new() { CpuTemp = cpu, GpuTemp = gpu, Fan1Rpm = rpm, Fan2Rpm = rpm };
+        var cases = new (string name, bool active, bool zone, Hardware.SensorSnapshot s, bool expect)[]
+        {
+            ("idle, both cool, fans off",          false, true,  S(43, 40, 0),    false),
+            ("GPU hot, CPU cool, fans off",        false, true,  S(45, 52, 0),    true),
+            ("GPU hot but fans already running",   false, true,  S(55, 60, 3000), false),
+            ("guard on, GPU still warm (48)",      true,  true,  S(45, 48, 2800), true),
+            ("guard on, GPU cooled to 44",         true,  true,  S(45, 44, 2800), false),
+            ("guard on, GPU cool but CPU hot",     true,  true,  S(52, 40, 2800), true),
+            ("guard on, GPU reading missing",      true,  true,  S(45, -1, 2800), true),
+            ("zone not in use",                    true,  false, S(45, 70, 0),    false),
+        };
+        int fails = 0;
+        foreach (var c in cases)
+        {
+            bool got = Core.Controller.GuardNext(c.active, c.zone, 50, c.s);
+            if (got != c.expect) fails++;
+            Log.Write($"GUARDTEST {(got == c.expect ? "PASS" : "FAIL")}: {c.name} -> {(got ? "guard on" : "guard off")}");
+        }
+        return fails;
     }
 
     private static int KbTest()

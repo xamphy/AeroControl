@@ -61,7 +61,35 @@ public sealed class Controller : IDisposable
     /// <summary>The fan setting a mode really uses: its own profile, or the custom curve if switched on for it.</summary>
     public FanMode FanFor(Mode m) => Settings.UsesCurve(m.Index) ? FanMode.Custom : m.Fan;
 
-    private System.Collections.Generic.List<(int, int)> CurveList => Settings.EffectiveCurve().Select(p => (p.temp, p.percent)).ToList();
+    /// <summary>
+    /// GPU guard for the fan-off zone: the EC's curve was only verified to react to CPU heat, so if the GPU passes the
+    /// threshold while the fans stand still, the zone is lifted (fans run the curve from 35%) until the GPU is 6 °C
+    /// below the threshold and the CPU below it too.
+    /// </summary>
+    private bool _gpuGuard;
+    private int ActiveOffBelow => _gpuGuard ? 0 : Settings.FanOffBelow;
+    private System.Collections.Generic.List<(int, int)> CurveList => Settings.EffectiveCurve(ActiveOffBelow).Select(p => (p.temp, p.percent)).ToList();
+
+    /// <summary>The guard's decision alone (no hardware), so it can be checked with made-up readings (--guardtest).</summary>
+    public static bool GuardNext(bool active, bool zoneInUse, int offBelow, SensorSnapshot l)
+    {
+        if (!zoneInUse) return false;
+        if (!active) return l.GpuTemp >= offBelow && l.Fan1Rpm == 0 && l.Fan2Rpm == 0;
+        return !(l.GpuTemp > 0 && l.GpuTemp <= offBelow - 6 && l.CpuTemp < offBelow);
+    }
+
+    private void GpuGuard()
+    {
+        int x = Settings.FanOffBelow;
+        bool zoneInUse = x > 0 && FanFor(CurrentMode) == FanMode.Custom;
+        var l = Live;
+        bool next = GuardNext(_gpuGuard, zoneInUse, x, l);
+        if (next == _gpuGuard) return;
+        _gpuGuard = next;
+        if (zoneInUse) Fans.WriteCurve(CurveList);
+        Log.Write(next ? $"GPU guard ON: gpu {l.GpuTemp} °C, cpu {l.CpuTemp} °C, fans were stopped; off zone lifted"
+                       : $"GPU guard off: gpu {l.GpuTemp} °C, cpu {l.CpuTemp} °C");
+    }
 
     public void SetFanOffBelow(int celsius)
     {
@@ -214,6 +242,7 @@ public sealed class Controller : IDisposable
     {
         Live = Sensors.Read();
         BatteryRateMw = Battery.RateMilliwatts();
+        GpuGuard();
         LiveUpdated?.Invoke();
     }
 

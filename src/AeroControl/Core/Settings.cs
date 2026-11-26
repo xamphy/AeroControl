@@ -27,11 +27,13 @@ public sealed class Settings
 
     /// <summary>The curve actually written to the EC: the user's curve with the fan-off zone applied.
     /// Points below the threshold go to 0%; the highest of them moves to the threshold so spin-up happens exactly there.</summary>
-    public System.Collections.Generic.List<(int temp, int percent)> EffectiveCurve()
+    public System.Collections.Generic.List<(int temp, int percent)> EffectiveCurve() => EffectiveCurve(FanOffBelow);
+
+    public System.Collections.Generic.List<(int temp, int percent)> EffectiveCurve(int offBelow)
     {
         var c = new System.Collections.Generic.List<(int temp, int percent)>();
         for (int i = 0; i < CurveTemps.Length && i < CurvePercents.Length; i++) c.Add((CurveTemps[i], CurvePercents[i]));
-        int x = FanOffBelow;
+        int x = offBelow;
         if (x <= 0 || c.Count == 0) return c;
         int last = -1;
         for (int i = 0; i < c.Count; i++) if (c[i].temp < x) { last = i; c[i] = (c[i].temp, 0); }
