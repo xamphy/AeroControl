@@ -23,7 +23,7 @@
         <Border Background="{DynamicResource Side}" BorderBrush="{DynamicResource Line}" BorderThickness="0,0,1,0">
             <DockPanel Margin="12,16,12,14" LastChildFill="False">
                 <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="6,0,0,14" Height="20">
-                    <Path Width="13" Height="13" Stretch="Uniform" Fill="{DynamicResource Sub}" VerticalAlignment="Center" Data="M3.25,87.5 L40,14 Q42.5,9 45,14 L77.5,79 L77.5,87.5 L49.5,87.5 L49.5,76.5 L65.25,76.5 L42.5,31 L14.25,87.5 Z" />
+                    <Path Width="13" Height="13" Stretch="Uniform" Fill="{DynamicResource Sub}" VerticalAlignment="Center" Data="{StaticResource LogoPath}" />
                     <TextBlock Text="Aero Control" Margin="8,0,0,0" FontSize="12" Foreground="{DynamicResource Sub}" VerticalAlignment="Center" />
                 </StackPanel>
 

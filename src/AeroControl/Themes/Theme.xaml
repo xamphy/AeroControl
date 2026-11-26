@@ -365,6 +365,23 @@
         </Setter>
     </Style>
 
+    <!-- Tooltips in the app's colours (the implicit TextBlock style made the stock tooltip's text white on white) -->
+    <Style TargetType="ToolTip">
+        <Setter Property="Background" Value="{DynamicResource Card}" />
+        <Setter Property="Foreground" Value="{DynamicResource Text}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource Line}" />
+        <Setter Property="HasDropShadow" Value="True" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ToolTip">
+                    <Border Background="{TemplateBinding Background}" BorderBrush="{DynamicResource Field}" BorderThickness="1" CornerRadius="7" Padding="9,5">
+                        <TextBlock Text="{TemplateBinding Content}" FontSize="12" Foreground="{TemplateBinding Foreground}" TextWrapping="Wrap" MaxWidth="320" />
+                    </Border>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
     <!-- Temperature bar: accent normally, amber when warm, red when hot (Tag = "", "warm", "hot") -->
     <Style x:Key="HeatBar" TargetType="ProgressBar">
         <Setter Property="Height" Value="4" />

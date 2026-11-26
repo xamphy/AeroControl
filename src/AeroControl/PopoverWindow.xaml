@@ -1,4 +1,4 @@
-﻿<Window x:Class="AeroControl.PopoverWindow"
+<Window x:Class="AeroControl.PopoverWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:v="clr-namespace:AeroControl.Views"
@@ -14,7 +14,7 @@
                 <Button DockPanel.Dock="Right" Width="32" Height="32" Click="OpenSettings_Click" ToolTip="Open Aero Control" AutomationProperties.Name="Open Aero Control settings" Cursor="Hand">
                     <Button.Template>
                         <ControlTemplate TargetType="Button">
-                            <Border CornerRadius="16" Background="{DynamicResource Tile}"><v:Icon Data="{StaticResource IcoSettings}" Stroke="{DynamicResource Text}" Width="16" Height="16" /></Border>
+                            <Border CornerRadius="16" Background="{DynamicResource Tile}"><Path Width="15" Height="15" Stretch="Uniform" Fill="{DynamicResource Text}" HorizontalAlignment="Center" VerticalAlignment="Center" Data="{StaticResource LogoPath}" /></Border>
                         </ControlTemplate>
                     </Button.Template>
                 </Button>

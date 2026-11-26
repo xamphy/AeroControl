@@ -44,6 +44,11 @@ Fan-off zone: built, hardware-tested (EC stops at 0%, restarts ~1 s after the CP
 ~6 °C hysteresis) and then REMOVED at the user's request ("20% is virtually silent anyway"). Don't re-add.
 Code is in git history (a2a45fd, b14ac96, reverted). Eco measured: 25% idle, 31% from ~55 °C.
 
+Later 2026-11-26: Settings icon = flat-top hex nut; tray popover's button = app logo (`LogoPath` in Icons.xaml,
+shared with the sidebar); global dark ToolTip style (tooltips were white text on white).
+Elevated installs from a script: don't use `Start-Process -Wait` on install.ps1 — it waits for the relaunched
+AeroControl too and never returns; use `-PassThru` and `.WaitForExit()`.
+
 ## What works (verified on hardware, GCC closed)
 
 | Area | Notes |
