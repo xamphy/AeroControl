@@ -40,19 +40,9 @@ flat 30% → duty 30/30%, ~2,800 rpm; then the mode's own fans restored. PASS.
 `--shot` now runs beside a running instance (no mutex, no keyboard HID, no Fn keys); run unelevated with
 `__COMPAT_LAYER=RunAsInvoker` to skip UAC (sensors then show "–"). Also renders `main-perf-curve.png`.
 
-**Fan-off zone** (user asked after the pass): Fans off below Never/50/55/60 °C, shown when the custom curve is on.
-`Settings.EffectiveCurve()` zeroes points below the threshold, moves the highest of them to the threshold, and lifts
-running points to >= 35% (spin-up from standstill verified at 35%; lower untested). Verified with `--fanofftest`:
-0% → 0 rpm at 43 °C idle; CPU load crossed 50 °C → fans restarted within ~1 s (35%, 2,557 rpm); EC has its own
-hysteresis (kept 35% down to ~44 °C, then stopped once; no flapping over 60 s). Editor shades the zone.
-
-Fan-off is a **custom-curve-only** feature (user decision; Silent keeps the EC's Eco profile — measured with
-`--ecoprofile`: 25% idle, 31% from ~55 °C, CPU never above 58 °C at Silent's 15 W).
-**GPU guard** (`Controller.GpuGuard/GuardNext`): only CPU heat was verified to restart the fans (no way to load the
-RTX 4050 without installing something; pip install was blocked). If the GPU reaches the threshold while both fans
-read 0 rpm, the app rewrites the curve without the off zone until GPU <= threshold-6 and CPU < threshold.
-Decision logic checked with `--guardtest` (8/8 PASS); the curve write itself is the tested path. Open: a real GPU-load
-test (e.g. a game in a custom-curve mode with fan-off on) — look for `GPU guard ON` in the log.
+Fan-off zone: built, hardware-tested (EC stops at 0%, restarts ~1 s after the CPU crosses the threshold, has its own
+~6 °C hysteresis) and then REMOVED at the user's request ("20% is virtually silent anyway"). Don't re-add.
+Code is in git history (a2a45fd, b14ac96, reverted). Eco measured: 25% idle, 31% from ~55 °C.
 
 ## What works (verified on hardware, GCC closed)
 
