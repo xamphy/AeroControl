@@ -49,6 +49,13 @@ shared with the sidebar); global dark ToolTip style (tooltips were white text on
 Elevated installs from a script: don't use `Start-Process -Wait` on install.ps1 — it waits for the relaunched
 AeroControl too and never returns; use `-PassThru` and `.WaitForExit()`.
 
+**Settings sweep for logs** (`AeroControl.exe --sweep [dir]`, elevated, normal app CLOSED so only one process owns the
+keyboard HID): really switches the 4 modes (9 s settle each), kb 0/24/48/64/100, charge 100/80/60; screenshots
+home/perf/keyboard/battery/popover/Fn popup per step (full page height) and writes `sweep.log` with the hardware readback
+(fans, duty, rpm, temps, PL from MSR, Windows mode, kb, charge). Restores mode/kb/charge at the end. Default output
+`%LOCALAPPDATA%\AeroControl\sweeps\<yyyyMMdd-HHmm>`. First run 2026-11-26 03:28: all readbacks matched, no HID trips
+(Turbo 7,927/8,167 rpm at 100%). Note: user is often on an external 1920x1080@60 monitor; that is not a bug.
+
 ## What works (verified on hardware, GCC closed)
 
 | Area | Notes |

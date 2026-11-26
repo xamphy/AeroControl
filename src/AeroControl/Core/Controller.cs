@@ -210,6 +210,25 @@ public sealed class Controller : IDisposable
         LiveUpdated?.Invoke();
     }
 
+    /// <summary>What the hardware reports right now (read on the worker, after any queued writes). For --sweep logs.</summary>
+    public System.Threading.Tasks.Task<string> DescribeAsync()
+    {
+        var t = new System.Threading.Tasks.TaskCompletionSource<string>();
+        Enqueue(() =>
+        {
+            try
+            {
+                var s = Sensors.Read(); Live = s;
+                t.SetResult($"fans={Fans.ReadMode()?.ToString() ?? "?"} duty={s.Fan1Pct}/{s.Fan2Pct}% rpm={s.Fan1Rpm}/{s.Fan2Rpm} " +
+                            $"cpu={s.CpuTemp}C gpu={s.GpuTemp}C pl={CpuPower.ReadLimits()} windows={WindowsPowerMode.Get()} " +
+                            $"kb={(_kb == null ? "none" : _kb.Tripped ? "DISABLED" : KeyboardLevel + "%")} " +
+                            $"charge={Battery.ReadLimit()?.ToString() ?? "?"} battery={s.BatteryPercent}% ac={OnAc}");
+            }
+            catch (Exception ex) { t.SetResult("describe failed: " + ex.Message); }
+        });
+        return t.Task;
+    }
+
     private void Enqueue(Action a) { if (!_queue.IsAddingCompleted) _queue.Add(a); }
 
     private void Work()

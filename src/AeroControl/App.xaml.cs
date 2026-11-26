@@ -75,6 +75,9 @@ public partial class App : Application
         { IsBackground = true };
         t.Start();
 
+        int sweep = Array.IndexOf(args, "--sweep");
+        if (sweep >= 0) { Sweep(sweep + 1 < args.Length && !args[sweep + 1].StartsWith("--") ? args[sweep + 1] : Path.Combine(Log.Dir, "sweeps", DateTime.Now.ToString("yyyyMMdd-HHmm"))); return; }
+
         int shot = Array.IndexOf(args, "--shot");
         if (shot >= 0) { Snapshots(shot + 1 < args.Length ? args[shot + 1] : Log.Dir); return; }
 
@@ -126,6 +129,138 @@ public partial class App : Application
     {
         _tray?.Dispose();
         base.OnExit(e);
+    }
+
+    /// <summary>
+    /// Settings sweep for logging: really switches each power mode, keyboard level and charge limit, waits for the
+    /// hardware to settle, screenshots the affected pages and writes what the hardware reports to sweep.log in the
+    /// same folder. Everything is put back as it was at the end. Run with the normal app closed (one HID owner).
+    /// </summary>
+    private async void Sweep(string dir)
+    {
+        Directory.CreateDirectory(dir);
+        var logFile = Path.Combine(dir, "sweep.log");
+        File.WriteAllText(logFile, "");
+        int n = 0;
+        async System.Threading.Tasks.Task Step(string name, params string[] pages)
+        {
+            n++;
+            string hw = await _controller.DescribeAsync();
+            string line = $"{DateTime.Now:HH:mm:ss} #{n:00} {name}: {hw}";
+            File.AppendAllText(logFile, line + Environment.NewLine);
+            Log.Write("SWEEP " + line);
+            foreach (var page in pages)
+            {
+                string file = $"{n:00}-{name}-{page}.png";
+                if (page == "popover")
+                {
+                    _popover.Toggle(); await System.Threading.Tasks.Task.Delay(700);
+                    SaveWindow(_popover, Path.Combine(dir, file));
+                    _popover.Toggle(); await System.Threading.Tasks.Task.Delay(300);
+                }
+                else
+                {
+                    _vm.Page = page; await System.Threading.Tasks.Task.Delay(500);
+                    SaveFull(_main, Path.Combine(dir, file));
+                }
+            }
+        }
+
+        var st = _controller.Settings;
+        _main.Show();
+        await System.Threading.Tasks.Task.Delay(3000);
+        string origMode = _controller.CurrentMode.Id;
+        var origCharge = st.Charge;
+        await _controller.DescribeAsync();
+        int origKb = _controller.KeyboardLevel;
+        File.AppendAllText(logFile, $"start: mode {origMode}, kb {origKb}%, charge {origCharge}, kbFollow {st.KbFollowMode}{Environment.NewLine}");
+        try
+        {
+            await Step("start", "home");
+
+            // power modes: switch for real, let the fans settle, then log + shoot
+            foreach (var m in Modes.All)
+            {
+                _controller.SelectMode(m.Id);
+                await System.Threading.Tasks.Task.Delay(9000);
+                await Step($"mode-{m.Id}", "home", "perf", "popover");
+            }
+            _controller.SelectMode(origMode);
+            await System.Threading.Tasks.Task.Delay(6000);
+
+            // keyboard backlight levels (the keyboard's own Fn+Space steps are 0/48/64/100)
+            var osd = new Views.OsdWindow();
+            foreach (int lvl in new[] { 0, 24, 48, 64, 100 })
+            {
+                _controller.SetKeyboard(lvl, remember: false);
+                _vm.RefreshFromHardware();
+                await System.Threading.Tasks.Task.Delay(1500);
+                osd.ShowLevel("M3 6h18v12H3zM7 10h.01M11 10h.01M15 10h.01M7 14h10", "Keyboard", lvl);
+                await System.Threading.Tasks.Task.Delay(500);
+                SaveWindow(osd, Path.Combine(dir, $"{n + 1:00}-kb-{lvl}-osd.png"));
+                await Step($"kb-{lvl}", "keyboard", "popover");
+            }
+
+            // charge limit
+            foreach (var l in new[] { Hardware.ChargeLimit.Full, Hardware.ChargeLimit.Balanced, Hardware.ChargeLimit.MaxHealth })
+            {
+                _controller.SetCharge(l);
+                await System.Threading.Tasks.Task.Delay(1500);
+                await Step($"charge-{Hardware.Battery.StopPercent(l)}", "battery", "home");
+            }
+        }
+        catch (Exception ex) { File.AppendAllText(logFile, "SWEEP ERROR " + ex + Environment.NewLine); }
+        finally
+        {
+            _controller.SelectMode(origMode);
+            if (origKb >= 0) _controller.SetKeyboard(origKb, remember: false);
+            _controller.SetCharge(origCharge);
+            await System.Threading.Tasks.Task.Delay(4000);
+            await Step("restored", "home");
+            Quit();
+        }
+
+        static void SaveWindow(Window w, string file) => SaveVisual((FrameworkElement)w.Content, w, file, w.Background);
+
+        // the main window with its scroll content at full height: window chrome + sidebar + whole page
+        static void SaveFull(Window w, string file)
+        {
+            var sv = FindSv(w);
+            var root = (FrameworkElement)w.Content;
+            double extra = sv == null ? 0 : Math.Max(0, sv.ExtentHeight - sv.ViewportHeight);
+            double old = w.Height;
+            if (extra > 0) { w.Height = old + extra; w.UpdateLayout(); }
+            SaveVisual(root, w, file, w.Background);
+            if (extra > 0) { w.Height = old; w.UpdateLayout(); }
+        }
+
+        static System.Windows.Controls.ScrollViewer FindSv(DependencyObject o)
+        {
+            if (o is System.Windows.Controls.ScrollViewer sv) return sv;
+            for (int i = 0; i < System.Windows.Media.VisualTreeHelper.GetChildrenCount(o); i++)
+                if (FindSv(System.Windows.Media.VisualTreeHelper.GetChild(o, i)) is { } f) return f;
+            return null;
+        }
+
+        static void SaveVisual(FrameworkElement root, Window w, string file, System.Windows.Media.Brush background)
+        {
+            root.UpdateLayout();
+            var dpi = System.Windows.Media.VisualTreeHelper.GetDpi(w);
+            double fw = root.ActualWidth + root.Margin.Left + root.Margin.Right, fh = root.ActualHeight + root.Margin.Top + root.Margin.Bottom;
+            var rtb = new System.Windows.Media.Imaging.RenderTargetBitmap((int)(fw * dpi.DpiScaleX), (int)(fh * dpi.DpiScaleY),
+                dpi.PixelsPerInchX, dpi.PixelsPerInchY, System.Windows.Media.PixelFormats.Pbgra32);
+            if (background is System.Windows.Media.SolidColorBrush b && b.Color.A > 0)
+            {
+                var bg = new System.Windows.Media.DrawingVisual();
+                using (var dc = bg.RenderOpen()) dc.DrawRectangle(b, null, new Rect(0, 0, fw, fh));
+                rtb.Render(bg);
+            }
+            rtb.Render(root);
+            var enc = new System.Windows.Media.Imaging.PngBitmapEncoder();
+            enc.Frames.Add(System.Windows.Media.Imaging.BitmapFrame.Create(rtb));
+            using var fs = File.Create(file);
+            enc.Save(fs);
+        }
     }
 
     /// <summary>Render every page of the main window and the popover to PNGs (read-only; for design review).</summary>
