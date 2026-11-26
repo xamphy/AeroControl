@@ -134,23 +134,36 @@ public partial class App : Application
         Directory.CreateDirectory(dir);
         _main.Show();
         await System.Threading.Tasks.Task.Delay(2500); // first sensor poll
-        foreach (var page in new[] { "home", "perf", "battery", "display", "keyboard", "about", "settings" })
-        {
-            _vm.Page = page;
-            await System.Threading.Tasks.Task.Delay(400);
-            Save(_main, Path.Combine(dir, $"main-{page}.png"));
-        }
-        // fan curve editor, shown in memory only (nothing saved or sent to the fans)
         var st = _controller.Settings;
-        var saved = st.CustomCurve;
-        st.CustomCurve = new[] { true, true, true, true };
-        _vm.Page = "perf";
-        await System.Threading.Tasks.Task.Delay(400);
-        Save(_main, Path.Combine(dir, "main-perf-curve.png"));
-        st.CustomCurve = saved;
-        _popover.Toggle();
-        await System.Threading.Tasks.Task.Delay(600);
-        Save(_popover, Path.Combine(dir, "popover.png"));
+        string[] pages = { "home", "perf", "battery", "display", "keyboard", "about", "settings" };
+        foreach (bool dark in new[] { true, false })
+        {
+            // the light pass is in memory only: nothing is saved
+            Themes.ThemeManager.Apply(dark, st.Accent);
+            string sfx = dark ? "" : "-light";
+            await System.Threading.Tasks.Task.Delay(300);
+            foreach (var page in pages)
+            {
+                _vm.Page = page;
+                await System.Threading.Tasks.Task.Delay(400);
+                Save(_main, Path.Combine(dir, $"main-{page}{sfx}.png"));
+                SaveFullPage(Path.Combine(dir, $"page-{page}{sfx}.png"));
+            }
+            // fan curve editor, shown in memory only (nothing saved or sent to the fans)
+            var saved = st.CustomCurve;
+            st.CustomCurve = new[] { true, true, true, true };
+            _vm.Page = "home"; _vm.Page = "perf";
+            await System.Threading.Tasks.Task.Delay(2200); // a sensor poll, so the live dot has a temperature
+            SaveFullPage(Path.Combine(dir, $"page-perf-curve{sfx}.png"));
+            st.CustomCurve = saved;
+            _vm.Page = "home";
+            _popover.Toggle();
+            await System.Threading.Tasks.Task.Delay(700);
+            Save(_popover, Path.Combine(dir, $"popover{sfx}.png"));
+            _popover.Toggle();
+            await System.Threading.Tasks.Task.Delay(300);
+        }
+        Themes.ThemeManager.Apply(st.DarkAppearance, st.Accent);
         var osd = new Views.OsdWindow();
         osd.ShowLevel("M4 9h4l5-4v14l-5-4H4zM16 9a4 4 0 0 1 0 6M18.5 6.5a8 8 0 0 1 0 11", "Volume", 48);
         await System.Threading.Tasks.Task.Delay(600);
@@ -161,6 +174,40 @@ public partial class App : Application
         await System.Threading.Tasks.Task.Delay(400);
         Save(osd, Path.Combine(dir, "osd-state.png"));
         Quit();
+
+        // The whole page, including what is scrolled out of view: the scroll viewer's content at its full height.
+        void SaveFullPage(string file)
+        {
+            var sv = FindScroll(_main);
+            if (sv?.Content is not FrameworkElement content) return;
+            content.UpdateLayout();
+            double fw = content.ActualWidth + content.Margin.Left + content.Margin.Right;
+            double fh = content.ActualHeight + content.Margin.Top + content.Margin.Bottom;
+            var dpi = System.Windows.Media.VisualTreeHelper.GetDpi(_main);
+            var rtb = new System.Windows.Media.Imaging.RenderTargetBitmap((int)(fw * dpi.DpiScaleX), (int)(fh * dpi.DpiScaleY),
+                dpi.PixelsPerInchX, dpi.PixelsPerInchY, System.Windows.Media.PixelFormats.Pbgra32);
+            var bg = new System.Windows.Media.DrawingVisual();
+            using (var dc = bg.RenderOpen()) dc.DrawRectangle(_main.Background, null, new Rect(0, 0, fw, fh));
+            rtb.Render(bg);
+            // render through a VisualBrush so the scroll offset does not shift the picture
+            var v = new System.Windows.Media.DrawingVisual();
+            using (var dc = v.RenderOpen())
+                dc.DrawRectangle(new System.Windows.Media.VisualBrush(content) { Stretch = System.Windows.Media.Stretch.None, AlignmentX = System.Windows.Media.AlignmentX.Left, AlignmentY = System.Windows.Media.AlignmentY.Top },
+                    null, new Rect(content.Margin.Left, content.Margin.Top, content.ActualWidth, content.ActualHeight));
+            rtb.Render(v);
+            var enc = new System.Windows.Media.Imaging.PngBitmapEncoder();
+            enc.Frames.Add(System.Windows.Media.Imaging.BitmapFrame.Create(rtb));
+            using var fs = File.Create(file);
+            enc.Save(fs);
+        }
+
+        static System.Windows.Controls.ScrollViewer FindScroll(DependencyObject o)
+        {
+            if (o is System.Windows.Controls.ScrollViewer sv) return sv;
+            for (int i = 0; i < System.Windows.Media.VisualTreeHelper.GetChildrenCount(o); i++)
+                if (FindScroll(System.Windows.Media.VisualTreeHelper.GetChild(o, i)) is { } f) return f;
+            return null;
+        }
 
         static void Save(Window w, string file)
         {

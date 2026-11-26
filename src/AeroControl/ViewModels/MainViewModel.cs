@@ -33,13 +33,21 @@ public sealed class ModeItem : Observable
         2 => "M13 2L4 14h7l-1 8 9-12h-7z",
         _ => "M12 2c3 4 5 6 5 10a5 5 0 0 1-10 0c0-2 1-3 2-4 0 2 1 3 2 3 0-3 1-6 1-9z",
     };
-    public string Short => $"{(Mode.Fan == FanMode.Max ? "Max" : Modes.FanLabel(Mode.Fan))} · {(Mode.CpuStageAc == "dc" ? "15" : "40")} W";
+    public string Short
+    {
+        get
+        {
+            var fan = _vm.Controller.FanFor(Mode);
+            string f = fan == FanMode.Custom ? "Custom" : fan == FanMode.Max ? "Max" : Modes.FanLabel(fan);
+            return $"{f} · {(Mode.CpuStageAc == "dc" ? "15" : "40")} W";
+        }
+    }
     public bool IsSelected
     {
         get => _vm.Controller.CurrentMode.Id == Mode.Id;
         set { if (value) _vm.Controller.SelectMode(Mode.Id); }
     }
-    public void Refresh() => Raise(nameof(IsSelected));
+    public void Refresh() { Raise(nameof(IsSelected)); Raise(nameof(Short)); }
 }
 
 public sealed class InfoRow { public string Label { get; set; } public string Value { get; set; } }

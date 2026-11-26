@@ -112,8 +112,9 @@ public sealed class FanCurveEditor : FrameworkElement
             dc.DrawEllipse(glow, null, at, 10, 10);
             dc.DrawEllipse(Brushes.White, new Pen(Accent, 2), at, 5, 5);
             var lbl = Text($"Now {t:0} °C", dpi, Accent);
-            double lx = Math.Min(r.Right - lbl.Width, Math.Max(r.Left, at.X - lbl.Width / 2));
-            dc.DrawText(lbl, new Point(lx, Math.Min(r.Bottom - lbl.Height - 4, at.Y + 12)));
+            // beside the dot, clear of the dashed drop line (left of it near the right edge)
+            double lx = at.X + 12 + lbl.Width <= r.Right ? at.X + 12 : at.X - 12 - lbl.Width;
+            dc.DrawText(lbl, new Point(lx, Math.Min(r.Bottom - lbl.Height - 2, at.Y + 6)));
         }
 
         for (int i = 0; i < pts.Count; i++)

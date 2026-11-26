@@ -34,7 +34,7 @@
                         </Border>
                         <StackPanel Margin="12,0,0,0" VerticalAlignment="Center">
                             <TextBlock Text="AERO 14 OLED" FontWeight="SemiBold" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}" />
-                            <TextBlock Text="BMF · i7-13620H" FontSize="11" Foreground="{DynamicResource Sub}" Margin="0,2,0,0" />
+                            <TextBlock Text="BMF · i7-13620H" FontSize="11" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}" Opacity="0.65" Margin="0,2,0,0" />
                         </StackPanel>
                     </StackPanel>
                 </RadioButton>
