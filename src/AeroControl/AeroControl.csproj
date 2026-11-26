@@ -12,7 +12,7 @@
     <ApplicationIcon>Assets\AeroControl.ico</ApplicationIcon>
     <AssemblyName>AeroControl</AssemblyName>
     <RootNamespace>AeroControl</RootNamespace>
-    <Version>0.1.0</Version>
+    <Version>0.2.0</Version>
     <GenerateAssemblyInfo>true</GenerateAssemblyInfo>
   </PropertyGroup>
 
