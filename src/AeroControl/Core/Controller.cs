@@ -53,6 +53,7 @@ public sealed class Controller : IDisposable
             if (Battery.ReadLimit() is ChargeLimit l) Settings.Charge = l;
             StateChanged?.Invoke();
         });
+        Usage.Start();
         _poll = new Timer(_ => Enqueue(Poll), null, 0, 2000);
     }
 

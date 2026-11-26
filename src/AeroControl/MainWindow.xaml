@@ -153,6 +153,29 @@
                             </Border>
                         </UniformGrid>
 
+                        <Border Style="{StaticResource CardBox}" CornerRadius="14" Padding="18,16" Margin="0,6,0,0">
+                            <StackPanel>
+                                <TextBlock Text="Usage" FontWeight="SemiBold" />
+                                <UniformGrid Columns="3" Margin="0,12,0,0">
+                                    <StackPanel Margin="0,0,18,0">
+                                        <DockPanel><TextBlock Text="CPU" Style="{StaticResource SubText}" FontSize="11" /><TextBlock DockPanel.Dock="Right" HorizontalAlignment="Right" Style="{StaticResource SubText}" FontSize="11" Text="i7-13620H" /></DockPanel>
+                                        <TextBlock Margin="0,4,0,6"><Run Text="{Binding CpuLoadText, Mode=OneWay}" FontSize="20" FontWeight="SemiBold" /><Run Text=" %" FontSize="13" Foreground="{DynamicResource Sub}" /></TextBlock>
+                                        <ProgressBar Style="{StaticResource HeatBar}" Value="{Binding CpuLoadPct, Mode=OneWay}" />
+                                    </StackPanel>
+                                    <StackPanel Margin="9,0,9,0">
+                                        <DockPanel><TextBlock Text="GPU" Style="{StaticResource SubText}" FontSize="11" /><TextBlock DockPanel.Dock="Right" HorizontalAlignment="Right" Style="{StaticResource SubText}" FontSize="11" Text="{Binding GpuLoadName, Mode=OneWay}" /></DockPanel>
+                                        <TextBlock Margin="0,4,0,6"><Run Text="{Binding GpuLoadText, Mode=OneWay}" FontSize="20" FontWeight="SemiBold" /><Run Text=" %" FontSize="13" Foreground="{DynamicResource Sub}" /></TextBlock>
+                                        <ProgressBar Style="{StaticResource HeatBar}" Value="{Binding GpuLoadPct, Mode=OneWay}" />
+                                    </StackPanel>
+                                    <StackPanel Margin="18,0,0,0">
+                                        <DockPanel><TextBlock Text="Memory" Style="{StaticResource SubText}" FontSize="11" /><TextBlock DockPanel.Dock="Right" HorizontalAlignment="Right" Style="{StaticResource SubText}" FontSize="11" Text="{Binding RamDetail, Mode=OneWay}" /></DockPanel>
+                                        <TextBlock Margin="0,4,0,6"><Run Text="{Binding RamText, Mode=OneWay}" FontSize="20" FontWeight="SemiBold" /><Run Text=" GB" FontSize="13" Foreground="{DynamicResource Sub}" /></TextBlock>
+                                        <ProgressBar Style="{StaticResource HeatBar}" Value="{Binding RamPct, Mode=OneWay}" />
+                                    </StackPanel>
+                                </UniformGrid>
+                            </StackPanel>
+                        </Border>
+
                         <UniformGrid Columns="2" Margin="-6,6,-6,0">
                             <Border Style="{StaticResource CardBox}" CornerRadius="14" Padding="18" Margin="6">
                                 <StackPanel>

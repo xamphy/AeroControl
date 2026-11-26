@@ -269,6 +269,8 @@ public partial class App : Application
         Directory.CreateDirectory(dir);
         _main.Show();
         await System.Threading.Tasks.Task.Delay(2500); // first sensor poll
+        for (int i = 0; i < 40 && !Hardware.Usage.Ready; i++) await System.Threading.Tasks.Task.Delay(250); // load counters warm up
+        await System.Threading.Tasks.Task.Delay(2500); // a poll with load values
         var st = _controller.Settings;
         string[] pages = { "home", "perf", "battery", "display", "keyboard", "about", "settings" };
         foreach (bool dark in new[] { true, false })

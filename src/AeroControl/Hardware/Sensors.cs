@@ -1,4 +1,4 @@
-﻿using System.Windows.Forms;
+using System.Windows.Forms;
 
 namespace AeroControl.Hardware;
 
@@ -6,6 +6,7 @@ public sealed class SensorSnapshot
 {
     public int CpuTemp = -1, GpuTemp = -1, Fan1Rpm = -1, Fan2Rpm = -1, Fan1Pct = -1, Fan2Pct = -1;
     public int BatteryPercent = -1;
+    public int CpuLoad = -1, GpuLoad = -1, RamUsedMb = -1, RamTotalMb = -1;
     public bool OnAc = true;
 }
 
@@ -23,6 +24,7 @@ public static class Sensors
         var ps = SystemInformation.PowerStatus;
         s.OnAc = ps.PowerLineStatus != PowerLineStatus.Offline;
         if (ps.BatteryLifePercent <= 1f) s.BatteryPercent = (int)(ps.BatteryLifePercent * 100);
+        Usage.Read(s);
         return s;
     }
 

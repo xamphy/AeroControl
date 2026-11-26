@@ -92,6 +92,8 @@ public sealed class MainViewModel : Observable
         Raise(nameof(Fan1Pct)); Raise(nameof(Fan2Pct)); Raise(nameof(BatteryText)); Raise(nameof(PowerSource));
         Raise(nameof(BatteryPercentText)); Raise(nameof(CpuHeat)); Raise(nameof(GpuHeat)); Raise(nameof(CpuTempValue));
         Raise(nameof(BatteryRateText));
+        Raise(nameof(CpuLoadText)); Raise(nameof(GpuLoadText)); Raise(nameof(RamText)); Raise(nameof(RamDetail));
+        Raise(nameof(CpuLoadPct)); Raise(nameof(GpuLoadPct)); Raise(nameof(RamPct));
     }
 
     /// <summary>Re-read values that can change outside the app (Fn keys): brightness, keyboard level.</summary>
@@ -139,6 +141,15 @@ public sealed class MainViewModel : Observable
     public string CpuHeat => L.CpuTemp >= 95 ? "hot" : L.CpuTemp >= 85 ? "warm" : "";
     public string GpuHeat => L.GpuTemp >= 85 ? "hot" : L.GpuTemp >= 78 ? "warm" : "";
     public double CpuTempValue => L.CpuTemp;
+    // load (Task Manager's counters; the RTX 4050 is never woken just to read it)
+    public string CpuLoadText => L.CpuLoad >= 0 ? $"{L.CpuLoad}" : "–";
+    public string GpuLoadText => L.GpuLoad >= 0 ? $"{L.GpuLoad}" : "–";
+    public double CpuLoadPct => Math.Max(0, L.CpuLoad) / 100.0;
+    public double GpuLoadPct => Math.Max(0, L.GpuLoad) / 100.0;
+    public string RamText => L.RamUsedMb >= 0 ? (L.RamUsedMb / 1024.0).ToString("0.0") : "–";
+    public string RamDetail => L.RamTotalMb > 0 ? $"of {L.RamTotalMb / 1024.0:0} GB · {100.0 * L.RamUsedMb / L.RamTotalMb:0}% used" : "";
+    public double RamPct => L.RamTotalMb > 0 ? (double)L.RamUsedMb / L.RamTotalMb : 0;
+    public string GpuLoadName => string.IsNullOrEmpty(Usage.GpuName) ? "RTX 4050 Laptop" : Usage.GpuName.Replace("NVIDIA GeForce ", "").Replace("Laptop GPU", "Laptop");
     public double Fan1Pct => Math.Max(0, L.Fan1Pct) / 100.0;
     public double Fan2Pct => Math.Max(0, L.Fan2Pct) / 100.0;
     public string PowerSource => Controller.OnAc ? "plugged in" : "on battery";
